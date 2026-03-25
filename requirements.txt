@@ -1,0 +1,8 @@
+streamlit
+pandas
+plotly
+google-generativeai
+openai
+fitparse
+watchdog
+garminconnect
