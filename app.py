@@ -28,7 +28,13 @@ def load_keys():
     return {}
 
 keys = load_keys()
-st.set_page_config(page_title="AI Coach 6.0", layout="wide")
+st.set_page_config(
+    page_title="AI Coach 6.0",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={}
+)
+
 
 # --- 3. CSS (精簡版，不再嘗試 sticky hack) ---
 st.markdown("""
@@ -80,16 +86,11 @@ st.markdown("""
 section.main > div.block-container {
     padding-bottom: 0 !important;
 }
-/* 隱藏右上角 Deploy 和 ... 工具列 */
-[data-testid="stToolbar"] {
-    display: none !important;
-}
-header[data-testid="stHeader"] {
-    height: 0 !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    visibility: hidden !important;
-}
+/* 隱藏 Deploy 和 ... 工具列，但不藏 header（sidebar 展開箭頭在裡面） */
+#MainMenu { visibility: hidden !important; }
+.stDeployButton { display: none !important; }
+[data-testid="stDecoration"] { display: none !important; }
+[data-testid="stStatusWidget"] { display: none !important; }
 /* chat_input 外層容器也要跟著高 */
 [data-testid="stChatInputContainer"] {
     min-height: 90px !important;
@@ -182,7 +183,7 @@ def trigger_coach_responses(user_input, data_summary, container):
         
         for speaker in speaker_order:
             if speaker == "luger":
-                with cp.chat_message(name="路格教練", avatar="luger.png"):
+                with cp.chat_message(name="路格教練", avatar="assets/luger.png"):
                     holder = st.empty()
                     holder.markdown("*💭 路格正在思考...*")
                     try:
@@ -197,10 +198,10 @@ def trigger_coach_responses(user_input, data_summary, container):
                     except Exception as e:
                         holder.markdown(f"路格異常: {e}")
                 
-                st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_l, "time": now_str})
+                st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "assets/luger.png", "content": full_l, "time": now_str})
             
             else:  # pace
-                with cp.chat_message(name="佩絲教練", avatar="pace.png"):
+                with cp.chat_message(name="佩絲教練", avatar="assets/pace.png"):
                     holder = st.empty()
                     holder.markdown("*💭 佩絲正在思考...*")
                     try:
@@ -213,7 +214,7 @@ def trigger_coach_responses(user_input, data_summary, container):
                     except Exception as e:
                         holder.markdown(f"佩絲異常: {e}")
                 
-                st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_p, "time": now_str})
+                st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "assets/pace.png", "content": full_p, "time": now_str})
         
         # 更新各輪的「上一次說的話」，供下一輪引用
         prev_luger = full_l
@@ -249,7 +250,7 @@ def trigger_coach_responses(user_input, data_summary, container):
             
             # 路格回應佩絲
             full_l_cc = ""
-            with cp.chat_message(name="路格教練", avatar="luger.png"):
+            with cp.chat_message(name="路格教練", avatar="assets/luger.png"):
                 holder = st.empty()
                 holder.markdown("*💭 路格正在思考...*")
                 try:
@@ -263,11 +264,11 @@ def trigger_coach_responses(user_input, data_summary, container):
                     full_l_cc = buf
                 except Exception as e:
                     holder.markdown(f"路格異常: {e}")
-            st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_l_cc, "time": now_str})
+            st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "assets/luger.png", "content": full_l_cc, "time": now_str})
             
             # 佩絲回路格
             full_p_cc = ""
-            with cp.chat_message(name="佩絲教練", avatar="pace.png"):
+            with cp.chat_message(name="佩絲教練", avatar="assets/pace.png"):
                 holder = st.empty()
                 holder.markdown("*💭 佩絲正在思考...*")
                 try:
@@ -280,7 +281,7 @@ def trigger_coach_responses(user_input, data_summary, container):
                     full_p_cc = buf
                 except Exception as e:
                     holder.markdown(f"佩絲異常: {e}")
-            st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_p_cc, "time": now_str})
+            st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "assets/pace.png", "content": full_p_cc, "time": now_str})
             
             # 更新 history 讓下一輪自聊能接著說
             luger_history.append({"role": "assistant", "content": full_l_cc})
@@ -312,7 +313,11 @@ with tab1:
 
         for turn_idx, turn in enumerate(turns):
             for msg_pos, msg in enumerate(turn):
-                with st.chat_message(name=msg.get("name", msg["role"]), avatar=msg.get("avatar")):
+                raw_av = msg.get("avatar") or ""
+                if raw_av and "/" not in raw_av:
+                    raw_av = f"assets/{raw_av}"
+                with st.chat_message(name=msg.get("name", msg["role"]), avatar=raw_av or None):
+
                     st.markdown(msg["content"])
                     if "time" in msg:
                         is_last = (msg_pos == len(turn) - 1)
@@ -371,10 +376,10 @@ with tab1:
             final_content = f"📎 [附件: {st.session_state.pending_file_name}]\n\n{user_input}"
             st.session_state.pending_summary = ""
 
-        st.session_state.messages.append({"role": "user", "name": "Edward", "avatar": "Edward.png", "content": final_content, "time": now_str})
+        st.session_state.messages.append({"role": "user", "name": "Edward", "avatar": "assets/Edward.png", "content": final_content, "time": now_str})
 
         with chat_box:
-            with st.chat_message(name="Edward", avatar="Edward.png"):
+            with st.chat_message(name="Edward", avatar="assets/Edward.png"):
                 st.markdown(final_content)
 
         trigger_coach_responses(user_input, this_turn_summary, chat_box)

@@ -13,7 +13,7 @@ def _get_gemini_model(api_key):
     return genai.GenerativeModel(target)
 
 def determine_rounds(api_key, user_input):
-    """使用 Gemini 判斷本輪對話應該幾輪討論 (1-3)，失敗則用隨機備案"""
+    """使用 Gemini 判斷本輪對話應該幾輪討論 (1-3)，失敗一律返回 1"""
     try:
         model = _get_gemini_model(api_key)
         prompt = prompts.ROUND_JUDGE_PROMPT.format(user_input=user_input)
@@ -21,9 +21,7 @@ def determine_rounds(api_key, user_input):
         rounds = int(resp.text.strip()[0])
         return max(1, min(3, rounds))
     except:
-        if len(user_input) > 50:
-            return random.choice([2, 3])
-        return 1
+        return 1  # 失敗時保守返回 1 輪，避免重複
 
 def determine_speakers(api_key, user_input, has_data=False):
     """
@@ -54,61 +52,92 @@ def determine_speakers(api_key, user_input, has_data=False):
         return ["pace", "luger"]
 
 def stream_luger(api_key, history, user_profile, summary, user_input, prev_pace_response=""):
-    """
-    路格回應。prev_pace_response 是佩絲上一輪說的話（多輪對話使用）。
-    """
+    """路格回應。prev_pace_response 是佩絲上一輪說的話（多輪對話使用）。"""
     try:
-        model = _get_gemini_model(api_key)
+        genai.configure(api_key=api_key.strip())
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target = "models/gemini-1.5-flash"
+        if target not in available:
+            gemini_models = [m for m in available if "gemini" in m]
+            target = gemini_models[0] if gemini_models else "models/gemini-pro"
+
         clean_summary = str(summary)[:2000] if summary else "目前無數據"
-        
         system_prompt = prompts.LUGER_SYSTEM_PROMPT.format(
             user_profile=user_profile,
             clean_summary=clean_summary
         )
-        
-        messages = [{"role": "user", "parts": [system_prompt]}]
+
+        # 使用 system_instruction 避免 Gemini 的 user/model 交替限制
+        model = genai.GenerativeModel(target, system_instruction=system_prompt)
+
+        # 確保 history 嚴格交替 user/model，避免 InvalidArgument
+        messages = []
+        last_role = None
         for msg in history:
             role = "user" if msg["role"] == "user" else "model"
-            messages.append({"role": role, "parts": [msg["content"]]})
-        
-        # 建構本輪的問題（可能包含佩絲上一輪的話）
-        # 無論對話多長，永遠在最後提醒核心跑者資訊，避免 Gemini 在長對話後失憶
+            if role == last_role:
+                # 合併相鄰同角色的訊息
+                messages[-1]["parts"][0] += "\n\n" + msg["content"]
+            else:
+                messages.append({"role": role, "parts": [msg["content"]]})
+                last_role = role
+
         profile_reminder = f"[重要：跑者基本資訊 - {user_profile}]"
         current_input = f"{profile_reminder}\n\n問題：{user_input}"
         if prev_pace_response:
             current_input += f"\n\n（佩絲剛才說：{prev_pace_response}  ——你有什麼要補充或反駁的嗎？）"
-        messages.append({"role": "user", "parts": [current_input]})
-        
+
+        # 如果 history 最後是 user，合併進去；否則新增一條
+        # 這樣可以防止連續 user 訊息（round 2+ 時 history 最後常是 user）
+        if messages and messages[-1]["role"] == "user":
+            messages[-1]["parts"][0] += "\n\n" + current_input
+        else:
+            messages.append({"role": "user", "parts": [current_input]})
+
         response = model.generate_content(messages, stream=True)
         for chunk in response:
             if chunk.text:
                 yield chunk.text
-                
+
     except Exception as e:
         yield f"路格診斷發生錯誤: {str(e)}"
 
-def stream_pace(api_key, user_profile, luger_analysis, summary, user_input="", prev_luger_response=""):
+def stream_pace(api_key, user_profile, luger_analysis, summary, user_input="", prev_luger_response="", history=None):
     """
-    佩絲回應。luger_analysis 是路格這輪說的話，prev_luger_response 是路格前幾輪說的（多輪使用）。
+    佩絲回應。history 是過去的對話記錄（與 luger_history 相同格式），
+    使佩絲能讀到過去 Edward 與路格的完整對話。
     """
     try:
         client = OpenAI(api_key=api_key.strip())
         clean_summary = str(summary)[:2000] if summary else "目前無數據"
-        
+
         system_content = prompts.PACE_SYSTEM_PROMPT.format(
             user_profile=user_profile,
             clean_summary=clean_summary
         )
-        
-        # 建構對話訊息
+
         chat_messages = [{"role": "system", "content": system_content}]
-        
-        if prev_luger_response:
-            chat_messages.append({"role": "assistant", "content": f"（路格之前說的）{prev_luger_response}"})
-        
-        chat_messages.append({"role": "assistant", "content": f"路格剛才說：{luger_analysis}"})
-        chat_messages.append({"role": "user", "content": f"[重要：跑者基本資訊 - {user_profile}]\n\nEdward 說：{user_input}\n\n請根據對話自然地接話。"})
-        
+
+        # 注入過去對話記錄
+        # 關鍵：路格的回應必須用 user 角色包裝，而非 assistant！
+        # OpenAI 的 assistant 角色 = 佩絲自己說的話，若用 assistant 注入路格的話，
+        # GPT 會以為那些都是「佩絲說的」，進而開始扮演路格（雙重人格）
+        if history:
+            for msg in history:
+                if msg["role"] == "user":
+                    chat_messages.append({"role": "user", "content": msg["content"]})
+                else:  # 路格說過的 → 包進 user 角色，標明出處
+                    chat_messages.append({"role": "user", "content": f"（路格說：）{msg['content']}"})
+
+        # 本輪當前訊息
+        if luger_analysis:
+            chat_messages.append({"role": "assistant", "content": f"（路格剛才說：）{luger_analysis}"})
+
+        chat_messages.append({
+            "role": "user",
+            "content": f"[重要：跑者基本資訊 - {user_profile}]\n\nEdward 說：{user_input}\n\n請根據對話自然地接話。"
+        })
+
         stream = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=chat_messages,
