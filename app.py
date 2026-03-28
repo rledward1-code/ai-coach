@@ -1,9 +1,10 @@
 import streamlit as st
 import json
+import pandas as pd
 import os
 import plotly.graph_objects as go
 from data_processor import process_fit_data
-from garmin_fetcher import get_garmin_data
+# from garmin_fetcher import get_garmin_data (removed)
 from coach_engine import stream_luger, stream_pace
 from history_manager import save_run_to_history, get_history_snapshot, save_chat_log, load_chat_log
 
@@ -86,138 +87,176 @@ with st.sidebar:
     u_max_hr = h1.number_input("最大心率", value=210)
     u_rest_hr = h2.number_input("靜息心率", value=56)
     u_threshold_hr = h3.number_input("閾值心率", value=193)
-    u_type = st.selectbox("跑步類型", ["輕鬆跑 (E)", "馬拉松配速 (M)", "乳酸閾值 (T)", "間歇 (I)", "全馬比賽", "半馬比賽"], index=5)
-    user_profile = f"跑者: {u_age}歲{u_gender}, 最大心率: {u_max_hr}, 靜息: {u_rest_hr}, 閾值: {u_threshold_hr}, 類型: {u_type}"
+    user_profile = f"跑者 (Edward): {u_age}歲{u_gender}, 最大心率: {u_max_hr}, 靜息: {u_rest_hr}, 閾值: {u_threshold_hr}, 類型: {u_type}"
 
 # --- 5. 置頂控制區 (Fixed Top) ---
 header_container = st.container()
 with header_container:
     st.markdown('<div class="fixed-top-header">', unsafe_allow_html=True)
-    t1, t2 = st.columns([1, 1.5], vertical_alignment="center")
-    with t1:
-        st.subheader("🏃‍♂️ AI Coach 6.0")
-    with t2:
-        sync_col, upload_col = st.columns([0.8, 1.2])
-        with sync_col:
-            if st.button("⬇️ Garmin 同步", use_container_width=True):
-                g_email = keys.get("GARMIN_EMAIL", "")
-                g_pass = keys.get("GARMIN_PASSWORD", "")
-                if g_email and g_pass:
-                    with st.spinner("⏳"):
-                        success, msg, api_summary = get_garmin_data(g_email, g_pass)
-                        if success:
-                            df, _, metrics = process_fit_data("temp.fit")
-                            st.session_state.df = df
-                            st.session_state.summary = api_summary
-                            st.session_state.metrics = metrics
-                            save_run_to_history(api_summary)
-                            st.rerun()
-                        else: st.error(msg)
-        with upload_col:
-            uploaded_file = st.file_uploader("手動上傳 .fit", type=["fit"], label_visibility="collapsed")
-            if uploaded_file:
-                if "last_file" not in st.session_state or st.session_state.last_file != uploaded_file.name:
-                    with open("temp.fit", "wb") as f: f.write(uploaded_file.getbuffer())
-                    df, summary, metrics = process_fit_data("temp.fit")
-                    st.session_state.df = df
-                    st.session_state.summary = summary
-                    st.session_state.metrics = metrics
-                    st.session_state.last_file = uploaded_file.name
-                    save_run_to_history(summary)
-                    st.rerun()
+    st.subheader("🏃‍♂️ AI Coach 6.0")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 6. 介面分頁 ---
+# --- 6. 核心處理邏輯 ---
+def trigger_coach_responses(user_input):
+    """
+    統一處理 AI 教練的回話流程 (支援動態順序與數據載入)
+    """
+    # 整理歷史訊息
+    gemini_history = []
+    for msg in st.session_state.messages: # 此时 user_input 已經在 messages 裡了
+        if msg["role"] == "user":
+            gemini_history.append({"role": "user", "content": msg["content"]})
+        elif msg["role"] == "assistant":
+            if msg.get("name") == "路格教練":
+                if gemini_history and gemini_history[-1]["role"] == "assistant":
+                    gemini_history[-1]["content"] += "\n\n" + msg["content"]
+                else:
+                    gemini_history.append({"role": "assistant", "content": msg["content"]})
+            else:
+                context_msg = f"(同事 {msg.get('name', '教練')} 說): {msg['content']}"
+                if gemini_history and gemini_history[-1]["role"] == "user":
+                    gemini_history[-1]["content"] += "\n\n" + context_msg
+                else:
+                    gemini_history.append({"role": "user", "content": context_msg})
+    
+    # 移除最後一筆 (即當前 user_input)，因 engine 內會手動加在尾部或處理
+    if gemini_history:
+        gemini_history = gemini_history[:-1]
+
+    history_context = get_history_snapshot()
+    full_context_summary = f"{history_context}\n\n[本次任務數據]:\n{st.session_state.summary}"
+
+    g_key = keys.get("GEMINI_API_KEY", "")
+    o_key = keys.get("OPENAI_API_KEY", "")
+
+    # 決定回答順序
+    is_pace_first = ("佩絲" in user_input.lower() or "pace" in user_input.lower())
+    full_luger_response = ""
+    full_pace_response = ""
+
+    chat_placeholder = st.container()
+
+    if is_pace_first:
+        # 佩絲先
+        with chat_placeholder.chat_message(name="佩絲教練", avatar="pace.png"):
+            p_holder = st.empty()
+            try:
+                p_stream = stream_pace(o_key, user_profile, "", full_context_summary, user_input)
+                for chunk in p_stream:
+                    full_pace_response += chunk
+                    p_holder.markdown(full_pace_response + "▌")
+                p_holder.markdown(full_pace_response)
+            except Exception as e: st.error(f"佩絲異常: {e}")
+        
+        with chat_placeholder.chat_message(name="路格教練", avatar="luger.png"):
+            l_holder = st.empty()
+            try:
+                l_stream = stream_luger(g_key, gemini_history, user_profile, full_context_summary, user_input)
+                for chunk in l_stream:
+                    full_luger_response += chunk
+                    l_holder.markdown(full_luger_response + "▌")
+                l_holder.markdown(full_luger_response)
+            except Exception as e: st.error(f"路格異常: {e}")
+        
+        st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_pace_response})
+        st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_luger_response})
+    else:
+        # 路格先
+        with chat_placeholder.chat_message(name="路格教練", avatar="luger.png"):
+            l_holder = st.empty()
+            try:
+                l_stream = stream_luger(g_key, gemini_history, user_profile, full_context_summary, user_input)
+                for chunk in l_stream:
+                    full_luger_response += chunk
+                    l_holder.markdown(full_luger_response + "▌")
+                l_holder.markdown(full_luger_response)
+            except Exception as e: st.error(f"路格異常: {e}")
+        
+        with chat_placeholder.chat_message(name="佩絲教練", avatar="pace.png"):
+            p_holder = st.empty()
+            try:
+                p_stream = stream_pace(o_key, user_profile, full_luger_response, full_context_summary, user_input)
+                for chunk in p_stream:
+                    full_pace_response += chunk
+                    p_holder.markdown(full_pace_response + "▌")
+                p_holder.markdown(full_pace_response)
+            except Exception as e: st.error(f"佩絲異常: {e}")
+            
+        st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_luger_response})
+        st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_pace_response})
+
+    save_chat_log(st.session_state.messages)
+
+# --- 7. 介面分頁 ---
 tab1, tab2 = st.tabs(["💬 雙教練會診室", "📊 數據看板"])
 
 with tab1:
-    chat_container = st.container()
+    chat_box = st.container()
     for msg in st.session_state.messages:
-        with chat_container.chat_message(name=msg.get("name", msg["role"]), avatar=msg.get("avatar")):
+        with chat_box.chat_message(name=msg.get("name", msg["role"]), avatar=msg.get("avatar")):
             st.markdown(msg["content"])
+
+    # --- 文件上傳入口 ---
+    uploaded_file = st.file_uploader("📎 上傳跑步數據 (.fit / .csv)", type=["fit", "csv"], label_visibility="collapsed")
+    if uploaded_file:
+        if "last_file" not in st.session_state or st.session_state.last_file != uploaded_file.name:
+            file_ext = uploaded_file.name.split(".")[-1].lower()
+            save_path = f"temp.{file_ext}"
+            with open(save_path, "wb") as f: f.write(uploaded_file.getbuffer())
+            
+            # 解析數據
+            df, summary, metrics = process_fit_data(save_path) 
+            st.session_state.df = df
+            st.session_state.summary = summary
+            st.session_state.metrics = metrics
+            st.session_state.last_file = uploaded_file.name
+            save_run_to_history(summary)
+            
+            # 手動新增上傳訊息並觸發回話
+            u_msg = f"我上傳了一個檔案：`{uploaded_file.name}`，教練們請根據這份數據給我分析。"
+            st.session_state.messages.append({"role": "user", "name": "Edward", "avatar": "Edward.png", "content": u_msg})
+            with chat_box.chat_message(name="Edward", avatar="Edward.png"):
+                st.markdown(u_msg)
+            
+            trigger_coach_responses(u_msg)
+            st.rerun()
 
     user_input = st.chat_input("詢問教練...")
     if user_input:
-        st.session_state.messages.append({"role": "user", "name": "跑者", "avatar": "🏃‍♂️", "content": user_input})
-        with chat_container.chat_message(name="跑者", avatar="🏃‍♂️"):
+        st.session_state.messages.append({"role": "user", "name": "Edward", "avatar": "Edward.png", "content": user_input})
+        with chat_box.chat_message(name="Edward", avatar="Edward.png"):
             st.markdown(user_input)
         
-        # 整理歷史訊息
-        gemini_history = []
-        current_model_text = ""
-        for msg in st.session_state.messages[:-1]:
-            if msg["role"] == "user":
-                if current_model_text:
-                    gemini_history.append({"role": "assistant", "content": current_model_text.strip()})
-                    current_model_text = ""
-                gemini_history.append({"role": "user", "content": msg["content"]})
-            elif msg["role"] == "assistant":
-                prefix = f"【{msg.get('name', '助手')}】\n"
-                current_model_text += prefix + msg["content"] + "\n\n"
-        if current_model_text:
-            gemini_history.append({"role": "assistant", "content": current_model_text.strip()})
-
-        history_context = get_history_snapshot()
-        full_context_summary = f"{history_context}\n\n[本次任務數據]:\n{st.session_state.summary}"
-
-        g_key = keys.get("GEMINI_API_KEY", "")
-        o_key = keys.get("OPENAI_API_KEY", "")
-
-        # --- 👨‍🏫 路格教練 ---
-        with chat_container.chat_message(name="路格教練", avatar="luger.png"):
-            luger_placeholder = st.empty()
-            full_luger_response = ""
-            try:
-                luger_stream = stream_luger(g_key, gemini_history, user_profile, full_context_summary, user_input)
-                for chunk in luger_stream:
-                    full_luger_response += chunk
-                    luger_placeholder.markdown(full_luger_response + "▌")
-                luger_placeholder.markdown(full_luger_response)
-            except Exception as e:
-                st.error(f"路格異常: {e}")
-                full_luger_response = "數據分析暫時中斷。"
-        st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_luger_response})
-
-        # --- 👩‍🏫 佩絲教練 ---
-        with chat_container.chat_message(name="佩絲教練", avatar="pace.png"):
-            pace_placeholder = st.empty()
-            full_pace_response = ""
-            try:
-                pace_stream = stream_pace(o_key, user_profile, full_luger_response, full_context_summary)
-                for chunk in pace_stream:
-                    full_pace_response += chunk
-                    pace_placeholder.markdown(full_pace_response + "▌")
-                pace_placeholder.markdown(full_pace_response)
-            except Exception as e:
-                st.error(f"佩絲異常: {e}")
-        st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_pace_response})
-        
-        save_chat_log(st.session_state.messages)
+        trigger_coach_responses(user_input)
+        st.rerun()
 
 with tab2:
-    if st.session_state.df is not None:
+    if st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df
-        st.subheader("📊 Garmin 專業數據看板")
+        st.subheader("📊 專業數據看板")
+        # 直接使用 metrics 字典
         garmin_map = {
-            'heart_rate': '💓 心率 (bpm)', 'enhanced_speed': '⏱️ 平均配速 (m/s)', 
-            'speed': '🏃 即時速度 (m/s)', 'cadence': '👣 步頻 (spm)', 
-            'step_length': '📏 步幅 (mm)', 'altitude': '⛰️ 海拔 (m)', 
-            'power': '⚡ 跑步功率 (W)', 'vertical_oscillation': '⬆️ 垂直振幅 (cm)',
-            'stance_time': '⏱️ 觸地時間 (ms)', 'dist_km': '📏 距離 (km)'
+            'heart_rate': '💓 心率 (bpm)', 'pace': '⏱️ 跑步配速 (min/km)', 
+            'cadence': '👣 步頻 (spm)', 'power': '⚡ 跑步功率 (W)',
+            'vertical_oscillation': '⬆️ 垂直振幅 (cm)', 'stance_time': '⏱️ 觸地時間 (ms)', 
+            'dist_km': '📏 距離 (km)', 'altitude': '⛰️ 海拔 (m)'
         }
-        all_numeric_cols = [c for c in df.select_dtypes(include=['number']).columns if c != 'timestamp']
+        all_numeric_cols = [c for c in df.columns if c in garmin_map and pd.api.types.is_numeric_dtype(df[c])]
+        
         selected_metrics = []
         check_cols = st.columns(4)
         for i, col in enumerate(all_numeric_cols):
             with check_cols[i % 4]:
-                display_name = garmin_map.get(col, f"🔍 ({col})")
-                if st.checkbox(display_name, value=(col in ['heart_rate', 'enhanced_speed']), key=f"v2_{col}"):
+                if st.checkbox(garmin_map.get(col, col), value=(col in ['heart_rate', 'pace']), key=f"v2_{col}"):
                     selected_metrics.append(col)
+        
         if selected_metrics:
             fig = go.Figure()
             for m in selected_metrics:
                 fig.add_trace(go.Scatter(x=df.index, y=df[m], name=garmin_map.get(m, m), mode='lines'))
             fig.update_layout(template="plotly_dark", height=600, hovermode="x unified")
+            if 'pace' in selected_metrics: # 配速軸反轉 (越小越快)
+                fig.update_layout(yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("👋 請由上方同步或上傳數據。")
+        st.info("👋 請由上方上傳數據檔案進行分析。")

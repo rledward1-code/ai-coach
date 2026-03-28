@@ -38,7 +38,7 @@ def stream_luger(api_key, history, user_profile, summary, user_input):
         # 這裡會噴出具體的錯誤訊息，如 'system_prompt' is not defined
         yield f"路格診斷發生錯誤: {str(e)}"
 
-def stream_pace(api_key, user_profile, luger_analysis, summary): # 增加 summary 參數
+def stream_pace(api_key, user_profile, luger_analysis, summary, user_input=""): # 增加 user_input 參數
     try:
         client = OpenAI(api_key=api_key.strip())
         
@@ -55,8 +55,8 @@ def stream_pace(api_key, user_profile, luger_analysis, summary): # 增加 summar
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_content},
-                {"role": "assistant", "content": f"路格分析結論: {luger_analysis}"},
-                {"role": "user", "content": "請根據跑步數據與路格的觀點，給予人性化的挑戰與建議。"}
+                {"role": "assistant", "content": f"路格教練剛才說了：{luger_analysis}"},
+                {"role": "user", "content": f"用戶剛剛說：{user_input}\n請根據對話內容，像朋友一樣自然地回話。如果是聊跑步以外的事，就配合他聊天。"}
             ],
             stream=True
         )
