@@ -1,26 +1,24 @@
 import streamlit as st
+import streamlit.components.v1 as st_components
 import json
 import pandas as pd
 import os
+import random
+from datetime import datetime
 import plotly.graph_objects as go
-from data_processor import process_fit_data
-# from garmin_fetcher import get_garmin_data (removed)
-from coach_engine import stream_luger, stream_pace
+from data_processor import process_data
+from coach_engine import stream_luger, stream_pace, determine_rounds, determine_speakers
 from history_manager import save_run_to_history, get_history_snapshot, save_chat_log, load_chat_log
 
-# --- 1. 初始化 Session State ---
-if "conversation_step" not in st.session_state:
-    st.session_state.conversation_step = "idle"
-if "last_luger_response" not in st.session_state:
-    st.session_state.last_luger_response = ""
+# --- 1. Session State 初始化 ---
 if "messages" not in st.session_state:
     st.session_state.messages = load_chat_log()
 if "df" not in st.session_state:
     st.session_state.df = None
-if "summary" not in st.session_state:
-    st.session_state.summary = "目前無數據上傳"
-if "metrics" not in st.session_state:
-    st.session_state.metrics = {}
+if "pending_summary" not in st.session_state:
+    st.session_state.pending_summary = ""
+if "pending_file_name" not in st.session_state:
+    st.session_state.pending_file_name = ""
 
 # --- 2. 金鑰管理 ---
 def load_keys():
@@ -32,53 +30,21 @@ def load_keys():
 keys = load_keys()
 st.set_page_config(page_title="AI Coach 6.0", layout="wide")
 
-# --- 3. UI 佈局 CSS 強化 ---
+# --- 3. CSS (精簡版，不再嘗試 sticky hack) ---
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117 !important; color: #fafafa !important; }
-    
-    /* 頂部固定組件 */
-    .fixed-top-header {
-        position: sticky;
-        top: 0;
-        background-color: #0e1117;
-        z-index: 1000;
-        padding: 10px 20px;
-        border-bottom: 2px solid #30363d;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-    
-    /* 讓 Tab 緊貼 Header */
-    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
-        position: sticky;
-        top: 85px;
-        background-color: #0e1117 !important;
-        z-index: 999;
-        padding-top: 5px;
-        border-bottom: 1px solid #30363d;
-    }
-    
-    /* 頭像縮放效果 */
     [data-testid="stChatMessage"] img {
-        width: 55px !important;
-        height: 55px !important;
-        border-radius: 50% !important;
-        transition: transform 0.3s ease-in-out !important;
+        width: 55px !important; height: 55px !important;
+        border-radius: 50% !important; transition: transform 0.2s;
     }
     [data-testid="stChatMessage"] img:hover {
-        transform: scale(2.5) !important;
-        z-index: 1100 !important;
-        position: relative;
-    }
-    
-    /* 隱藏文件上傳器的多餘邊距 */
-    [data-testid="stFileUploadDropzone"] {
-        padding: 5px !important;
+        transform: scale(2.5) !important; z-index: 9999 !important; position: relative;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. 側邊欄：個人檔案 ---
+# --- 4. 側邊欄：個人檔案 + 檔案上傳 ---
 with st.sidebar:
     st.header("👤 跑者個人檔案")
     u_age = st.number_input("年齡", value=56)
@@ -87,176 +53,350 @@ with st.sidebar:
     u_max_hr = h1.number_input("最大心率", value=210)
     u_rest_hr = h2.number_input("靜息心率", value=56)
     u_threshold_hr = h3.number_input("閾值心率", value=193)
-    user_profile = f"跑者 (Edward): {u_age}歲{u_gender}, 最大心率: {u_max_hr}, 靜息: {u_rest_hr}, 閾值: {u_threshold_hr}, 類型: {u_type}"
+    user_profile = f"跑者 (Edward): {u_age}歲{u_gender}, 最大心率: {u_max_hr}, 靜息: {u_rest_hr}, 閾值: {u_threshold_hr}"
 
-# --- 5. 置頂控制區 (Fixed Top) ---
-header_container = st.container()
-with header_container:
-    st.markdown('<div class="fixed-top-header">', unsafe_allow_html=True)
-    st.subheader("🏃‍♂️ AI Coach 6.0")
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.divider()
+    st.subheader("📎 上傳訓練數據")
+    uploaded_file = st.file_uploader("FIT / CSV", type=["fit", "csv"], label_visibility="collapsed")
+    if uploaded_file and uploaded_file.name != st.session_state.pending_file_name:
+        file_ext = uploaded_file.name.split(".")[-1].lower()
+        save_path = f"temp.{file_ext}"
+        with open(save_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        df, summary, _ = process_data(save_path)
+        st.session_state.df = df
+        st.session_state.pending_summary = summary
+        st.session_state.pending_file_name = uploaded_file.name
+        save_run_to_history(summary)
 
-# --- 6. 核心處理邏輯 ---
-def trigger_coach_responses(user_input):
-    """
-    統一處理 AI 教練的回話流程 (支援動態順序與數據載入)
-    """
-    # 整理歷史訊息
-    gemini_history = []
-    for msg in st.session_state.messages: # 此时 user_input 已經在 messages 裡了
-        if msg["role"] == "user":
-            gemini_history.append({"role": "user", "content": msg["content"]})
-        elif msg["role"] == "assistant":
-            if msg.get("name") == "路格教練":
-                if gemini_history and gemini_history[-1]["role"] == "assistant":
-                    gemini_history[-1]["content"] += "\n\n" + msg["content"]
-                else:
-                    gemini_history.append({"role": "assistant", "content": msg["content"]})
-            else:
-                context_msg = f"(同事 {msg.get('name', '教練')} 說): {msg['content']}"
-                if gemini_history and gemini_history[-1]["role"] == "user":
-                    gemini_history[-1]["content"] += "\n\n" + context_msg
-                else:
-                    gemini_history.append({"role": "user", "content": context_msg})
+    if st.session_state.pending_file_name:
+        st.success(f"✅ {st.session_state.pending_file_name}")
+        st.caption("輸入訊息即可發送分析。")
+
+# --- 5. CSS 注入 ---
+st.markdown("""
+<style>
+/* 讓 height= 容器填滿可用空間 */
+section.main > div.block-container {
+    padding-bottom: 0 !important;
+}
+/* 隱藏右上角 Deploy 和 ... 工具列 */
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+header[data-testid="stHeader"] {
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    visibility: hidden !important;
+}
+/* chat_input 外層容器也要跟著高 */
+[data-testid="stChatInputContainer"] {
+    min-height: 90px !important;
+}
+[data-testid="stChatInputContainer"] textarea {
+    min-height: 75px !important;
+    max-height: 200px !important;
+    resize: vertical !important;
+}
+/* 疄小化 file uploader 成一条紧湊的小拖放區 */
+[data-testid="stFileUploaderDropzone"] {
+    padding: 4px 10px !important;
+    min-height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+/* 隱藏指示文字 "Drag and drop..." 讓 uploader 更精簡 */
+[data-testid="stFileUploaderDropzoneInstructions"] div span:first-child {
+    display: none !important;
+}
+[data-testid="stFileUploaderDropzoneInstructions"] div span:last-child::before {
+    content: '📎 .csv / .fit 拖入或點擇 — ';
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+
+# --- 6. 核心處理邏輯 (多輪對話版) ---
+def trigger_coach_responses(user_input, data_summary, container):
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    time_prefix = f"[系統時間: {now_str}]\n"
     
-    # 移除最後一筆 (即當前 user_input)，因 engine 內會手動加在尾部或處理
-    if gemini_history:
-        gemini_history = gemini_history[:-1]
+    # 為路格建立歷史：路格的回覆 = model，佩絲的回覆 = user context（關鍵！）
+    # 這樣 Gemini 才知道佩絲是「別人」，不會把兩個角色都演出來
+    luger_history = []
+    for msg in st.session_state.messages:
+        t = msg.get("time", "")
+        c = msg["content"]
+        name = msg.get("name", "")
+        if msg["role"] == "user":
+            luger_history.append({"role": "user", "content": f"({t}) {c}"})
+        elif name == "路格教練":
+            # 路格自己說過的話 = model
+            luger_history.append({"role": "assistant", "content": f"({t}) {c}"})
+        elif name == "佩絲教練":
+            # 佩絲的話對路格來說是「別人說的話」，掛在 user 角色下
+            if luger_history and luger_history[-1]["role"] == "user":
+                luger_history[-1]["content"] += f"\n\n(同行的佩絲說: {c})"
+            else:
+                luger_history.append({"role": "user", "content": f"(同行的佩絲說: {c})"})
+    if luger_history: luger_history = luger_history[:-1]
 
     history_context = get_history_snapshot()
-    full_context_summary = f"{history_context}\n\n[本次任務數據]:\n{st.session_state.summary}"
+    full_cv = f"{history_context}\n\n[本次任務數據]:\n{data_summary if data_summary else '目前無上傳數據'}"
 
-    g_key = keys.get("GEMINI_API_KEY", "")
-    o_key = keys.get("OPENAI_API_KEY", "")
-
-    # 決定回答順序
-    is_pace_first = ("佩絲" in user_input.lower() or "pace" in user_input.lower())
-    full_luger_response = ""
-    full_pace_response = ""
-
-    chat_placeholder = st.container()
-
-    if is_pace_first:
-        # 佩絲先
-        with chat_placeholder.chat_message(name="佩絲教練", avatar="pace.png"):
-            p_holder = st.empty()
-            try:
-                p_stream = stream_pace(o_key, user_profile, "", full_context_summary, user_input)
-                for chunk in p_stream:
-                    full_pace_response += chunk
-                    p_holder.markdown(full_pace_response + "▌")
-                p_holder.markdown(full_pace_response)
-            except Exception as e: st.error(f"佩絲異常: {e}")
+    g_key, o_key = keys.get("GEMINI_API_KEY", ""), keys.get("OPENAI_API_KEY", "")
+    
+    # === 決定本次誰應該回應 ===
+    has_data = bool(data_summary)
+    first_round_speakers = determine_speakers(g_key, user_input, has_data=has_data)
+    # 決定討論輪數（只有當兩人都參與時才可能多輪）
+    n_rounds = determine_rounds(g_key, user_input) if len(first_round_speakers) > 1 else 1
+    
+    prev_luger = ""
+    prev_pace = ""
+    all_luger_responses = []
+    all_pace_responses = []
+    
+    for round_idx in range(n_rounds):
+        cp = container   # 渲染在傳入的容器中，確保 chat_input 永遠在容器下方
+        round_input = (time_prefix if round_idx == 0 else "") + user_input
         
-        with chat_placeholder.chat_message(name="路格教練", avatar="luger.png"):
-            l_holder = st.empty()
-            try:
-                l_stream = stream_luger(g_key, gemini_history, user_profile, full_context_summary, user_input)
-                for chunk in l_stream:
-                    full_luger_response += chunk
-                    l_holder.markdown(full_luger_response + "▌")
-                l_holder.markdown(full_luger_response)
-            except Exception as e: st.error(f"路格異常: {e}")
+        # 第一輪用 AI 判斷的 speaker order，後續輪次：旁觀者有 40% 機率插話
+        if round_idx == 0:
+            speaker_order = first_round_speakers
+        else:
+            all_speakers = ["luger", "pace"]
+            # 上一輪沒說話的人，這輪有 40% 機率插話
+            speaker_order = []
+            for sp in all_speakers:
+                if sp in first_round_speakers or random.random() < 0.4:
+                    speaker_order.append(sp)
+            if not speaker_order:
+                speaker_order = [random.choice(all_speakers)]
+            # 隨機決定先後順序
+            random.shuffle(speaker_order)
         
-        st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_pace_response})
-        st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_luger_response})
-    else:
-        # 路格先
-        with chat_placeholder.chat_message(name="路格教練", avatar="luger.png"):
-            l_holder = st.empty()
-            try:
-                l_stream = stream_luger(g_key, gemini_history, user_profile, full_context_summary, user_input)
-                for chunk in l_stream:
-                    full_luger_response += chunk
-                    l_holder.markdown(full_luger_response + "▌")
-                l_holder.markdown(full_luger_response)
-            except Exception as e: st.error(f"路格異常: {e}")
+        full_l, full_p = "", ""
         
-        with chat_placeholder.chat_message(name="佩絲教練", avatar="pace.png"):
-            p_holder = st.empty()
-            try:
-                p_stream = stream_pace(o_key, user_profile, full_luger_response, full_context_summary, user_input)
-                for chunk in p_stream:
-                    full_pace_response += chunk
-                    p_holder.markdown(full_pace_response + "▌")
-                p_holder.markdown(full_pace_response)
-            except Exception as e: st.error(f"佩絲異常: {e}")
+        for speaker in speaker_order:
+            if speaker == "luger":
+                with cp.chat_message(name="路格教練", avatar="luger.png"):
+                    holder = st.empty()
+                    holder.markdown("*💭 路格正在思考...*")
+                    try:
+                        buf = ""
+                        # 多輪時 luger_history 已包含 prev_pace，不再重複傳入
+                        _prev_pace_arg = "" if (round_idx > 0 and n_rounds > 1) else prev_pace
+                        for chk in stream_luger(g_key, luger_history, user_profile, full_cv, round_input, prev_pace_response=_prev_pace_arg):
+                            buf += chk
+                            holder.markdown(buf + "▌")
+                        holder.markdown(buf)
+                        full_l = buf
+                    except Exception as e:
+                        holder.markdown(f"路格異常: {e}")
+                
+                st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_l, "time": now_str})
             
-        st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_luger_response})
-        st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_pace_response})
-
+            else:  # pace
+                with cp.chat_message(name="佩絲教練", avatar="pace.png"):
+                    holder = st.empty()
+                    holder.markdown("*💭 佩絲正在思考...*")
+                    try:
+                        buf = ""
+                        for chk in stream_pace(o_key, user_profile, full_l, full_cv, user_input, prev_luger_response=prev_luger):
+                            buf += chk
+                            holder.markdown(buf + "▌")
+                        holder.markdown(buf)
+                        full_p = buf
+                    except Exception as e:
+                        holder.markdown(f"佩絲異常: {e}")
+                
+                st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_p, "time": now_str})
+        
+        # 更新各輪的「上一次說的話」，供下一輪引用
+        prev_luger = full_l
+        prev_pace = full_p
+        
+        # 多輪時：將本輪回應追加進 luger_history，讓後續輪次能看到完整的當次對話脈絡
+        # 單輪時這段不執行（n_rounds == 1），避免無謂的 context 膨脹
+        if n_rounds > 1:
+            # 本輪 Edward 的訊息（只在第一輪加，避免重複）
+            if round_idx == 0:
+                luger_history.append({"role": "user", "content": f"({now_str}) {user_input}"})
+            # 路格自己的回應 = model
+            if full_l:
+                luger_history.append({"role": "assistant", "content": full_l})
+            # 佩絲的回應 = user context（保持角色隔離原則）
+            if full_p:
+                if luger_history and luger_history[-1]["role"] == "user":
+                    luger_history[-1]["content"] += f"\n\n(佩絲說: {full_p})"
+                else:
+                    luger_history.append({"role": "user", "content": f"(佩絲說: {full_p})"})
+    
+    # 偵測教練間是否開始自聊：若最後回應提到對方名字，觸發最多 2 輪的教練自主對話
+    # Edward 在此期間變成旁觀者
+    def _coaches_talking_to_each_other(luger_resp, pace_resp):
+        # 只檢測明確提到對方名字，避免「你說」「你覺得」這類通用詞濒繁觸發
+        luger_mentions_pace = any(kw in luger_resp for kw in ["佩絲", "Coach Pace"])
+        pace_mentions_luger = any(kw in pace_resp for kw in ["路格", "Coach Luger"])
+        return luger_mentions_pace and pace_mentions_luger  # 必須兩人都提到對方，才觸發自聘
+    
+    if _coaches_talking_to_each_other(prev_luger, prev_pace):
+        for coach_chat_idx in range(2):  # 最多 2 輪自主對話
+            cp = container
+            
+            # 路格回應佩絲
+            full_l_cc = ""
+            with cp.chat_message(name="路格教練", avatar="luger.png"):
+                holder = st.empty()
+                holder.markdown("*💭 路格正在思考...*")
+                try:
+                    # 用空的 user_input，讓教練自行接話
+                    coach_prompt = f"（繼續剛才的討論，對佩絲說話，不需要理會 Edward）"
+                    buf = ""
+                    for chk in stream_luger(g_key, luger_history, user_profile, full_cv, coach_prompt, prev_pace_response=prev_pace):
+                        buf += chk
+                        holder.markdown(buf + "▌")
+                    holder.markdown(buf)
+                    full_l_cc = buf
+                except Exception as e:
+                    holder.markdown(f"路格異常: {e}")
+            st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "luger.png", "content": full_l_cc, "time": now_str})
+            
+            # 佩絲回路格
+            full_p_cc = ""
+            with cp.chat_message(name="佩絲教練", avatar="pace.png"):
+                holder = st.empty()
+                holder.markdown("*💭 佩絲正在思考...*")
+                try:
+                    coach_prompt_p = f"（繼續跟路格討論，不需要特別理會 Edward）"
+                    buf = ""
+                    for chk in stream_pace(o_key, user_profile, full_l_cc, full_cv, coach_prompt_p, prev_luger_response=prev_luger):
+                        buf += chk
+                        holder.markdown(buf + "▌")
+                    holder.markdown(buf)
+                    full_p_cc = buf
+                except Exception as e:
+                    holder.markdown(f"佩絲異常: {e}")
+            st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "pace.png", "content": full_p_cc, "time": now_str})
+            
+            # 更新 history 讓下一輪自聊能接著說
+            luger_history.append({"role": "assistant", "content": full_l_cc})
+            if full_p_cc:
+                if luger_history[-1]["role"] == "user":
+                    luger_history[-1]["content"] += f"\n\n(佩絲說: {full_p_cc})"
+                else:
+                    luger_history.append({"role": "user", "content": f"(佩絲說: {full_p_cc})"})
+            prev_luger, prev_pace = full_l_cc, full_p_cc
+            
+            # 若教練們已不再互相提及，停止自主對話
+            if not _coaches_talking_to_each_other(full_l_cc, full_p_cc):
+                break
+    
     save_chat_log(st.session_state.messages)
 
-# --- 7. 介面分頁 ---
+# --- 7. 分頁介面 ---
 tab1, tab2 = st.tabs(["💬 雙教練會診室", "📊 數據看板"])
 
 with tab1:
-    chat_box = st.container()
-    for msg in st.session_state.messages:
-        with chat_box.chat_message(name=msg.get("name", msg["role"]), avatar=msg.get("avatar")):
-            st.markdown(msg["content"])
+    chat_box = st.container(height=600)
+    with chat_box:
+        turns = []
+        for msg in st.session_state.messages:
+            if msg["role"] == "user":
+                turns.append([msg])
+            elif turns:
+                turns[-1].append(msg)
 
-    # --- 文件上傳入口 ---
-    uploaded_file = st.file_uploader("📎 上傳跑步數據 (.fit / .csv)", type=["fit", "csv"], label_visibility="collapsed")
-    if uploaded_file:
-        if "last_file" not in st.session_state or st.session_state.last_file != uploaded_file.name:
-            file_ext = uploaded_file.name.split(".")[-1].lower()
-            save_path = f"temp.{file_ext}"
-            with open(save_path, "wb") as f: f.write(uploaded_file.getbuffer())
-            
-            # 解析數據
-            df, summary, metrics = process_fit_data(save_path) 
-            st.session_state.df = df
-            st.session_state.summary = summary
-            st.session_state.metrics = metrics
-            st.session_state.last_file = uploaded_file.name
-            save_run_to_history(summary)
-            
-            # 手動新增上傳訊息並觸發回話
-            u_msg = f"我上傳了一個檔案：`{uploaded_file.name}`，教練們請根據這份數據給我分析。"
-            st.session_state.messages.append({"role": "user", "name": "Edward", "avatar": "Edward.png", "content": u_msg})
-            with chat_box.chat_message(name="Edward", avatar="Edward.png"):
-                st.markdown(u_msg)
-            
-            trigger_coach_responses(u_msg)
-            st.rerun()
+        for turn_idx, turn in enumerate(turns):
+            for msg_pos, msg in enumerate(turn):
+                with st.chat_message(name=msg.get("name", msg["role"]), avatar=msg.get("avatar")):
+                    st.markdown(msg["content"])
+                    if "time" in msg:
+                        is_last = (msg_pos == len(turn) - 1)
+                        if is_last:
+                            tc, _, dc = st.columns([8, 1, 1])
+                            tc.caption(f"🕒 {msg['time']}")
+                            if dc.button("🗑️", key=f"del_{turn_idx}", help="刪除此組對話"):
+                                count = 0
+                                msg_idx = 0
+                                for i, m in enumerate(st.session_state.messages):
+                                    if m["role"] == "user":
+                                        if count == turn_idx:
+                                            msg_idx = i
+                                            break
+                                        count += 1
+                                end_idx = msg_idx + 1
+                                while end_idx < len(st.session_state.messages) and st.session_state.messages[end_idx]["role"] != "user":
+                                    end_idx += 1
+                                del st.session_state.messages[msg_idx:end_idx]
+                                save_chat_log(st.session_state.messages)
+                                st.rerun()
+                        else:
+                            st.caption(f"🕒 {msg['time']}")
+
+    # 緊湊的 file_uploader（CSS 已縮小外觀，保留原生拖放功能）
+    uploaded_file = st.file_uploader(
+        "hidden", type=["fit", "csv"],
+        label_visibility="collapsed",
+        key="main_uploader"
+    )
+
+    if uploaded_file and uploaded_file.name != st.session_state.get("pending_file_name"):
+        file_ext = uploaded_file.name.split(".")[-1].lower()
+        save_path = f"temp.{file_ext}"
+        with open(save_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        df, summary, _ = process_data(save_path)
+        st.session_state.df = df
+        st.session_state.pending_summary = summary
+        st.session_state.pending_file_name = uploaded_file.name
+        save_run_to_history(summary)
+        st.rerun()
+
+    # 狀態提示：有附件時顯示，否則靜默
+    if st.session_state.get("pending_file_name"):
+        st.caption(f"✅ `{st.session_state.pending_file_name}` 已就緒，輸入訊息後一起發送")
 
     user_input = st.chat_input("詢問教練...")
     if user_input:
-        st.session_state.messages.append({"role": "user", "name": "Edward", "avatar": "Edward.png", "content": user_input})
-        with chat_box.chat_message(name="Edward", avatar="Edward.png"):
-            st.markdown(user_input)
-        
-        trigger_coach_responses(user_input)
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        final_content = user_input
+        this_turn_summary = ""
+
+        if st.session_state.pending_summary:
+            this_turn_summary = st.session_state.pending_summary
+            final_content = f"📎 [附件: {st.session_state.pending_file_name}]\n\n{user_input}"
+            st.session_state.pending_summary = ""
+
+        st.session_state.messages.append({"role": "user", "name": "Edward", "avatar": "Edward.png", "content": final_content, "time": now_str})
+
+        with chat_box:
+            with st.chat_message(name="Edward", avatar="Edward.png"):
+                st.markdown(final_content)
+
+        trigger_coach_responses(user_input, this_turn_summary, chat_box)
         st.rerun()
 
 with tab2:
     if st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df
-        st.subheader("📊 專業數據看板")
-        # 直接使用 metrics 字典
-        garmin_map = {
-            'heart_rate': '💓 心率 (bpm)', 'pace': '⏱️ 跑步配速 (min/km)', 
-            'cadence': '👣 步頻 (spm)', 'power': '⚡ 跑步功率 (W)',
-            'vertical_oscillation': '⬆️ 垂直振幅 (cm)', 'stance_time': '⏱️ 觸地時間 (ms)', 
-            'dist_km': '📏 距離 (km)', 'altitude': '⛰️ 海拔 (m)'
-        }
-        all_numeric_cols = [c for c in df.columns if c in garmin_map and pd.api.types.is_numeric_dtype(df[c])]
-        
-        selected_metrics = []
-        check_cols = st.columns(4)
-        for i, col in enumerate(all_numeric_cols):
-            with check_cols[i % 4]:
-                if st.checkbox(garmin_map.get(col, col), value=(col in ['heart_rate', 'pace']), key=f"v2_{col}"):
-                    selected_metrics.append(col)
-        
-        if selected_metrics:
+        st.subheader("📊 數據看板")
+        g_map = {'heart_rate': '💓 心率', 'pace': '⏱️ 配速', 'cadence': '👣 步頻'}
+        cols = [c for c in df.columns if c in g_map]
+        sel = []
+        if cols:
+            cc = st.columns(len(cols))
+            for i, c in enumerate(cols):
+                with cc[i]:
+                    if st.checkbox(g_map[c], value=(c in ['heart_rate','pace']), key=f"vf_{c}"): sel.append(c)
+        if sel:
             fig = go.Figure()
-            for m in selected_metrics:
-                fig.add_trace(go.Scatter(x=df.index, y=df[m], name=garmin_map.get(m, m), mode='lines'))
-            fig.update_layout(template="plotly_dark", height=600, hovermode="x unified")
-            if 'pace' in selected_metrics: # 配速軸反轉 (越小越快)
-                fig.update_layout(yaxis=dict(autorange="reversed"))
+            for m in sel: fig.add_trace(go.Scatter(x=df.index, y=df[m], name=g_map[m], mode='lines'))
+            fig.update_layout(template="plotly_dark", height=500)
+            if 'pace' in sel: fig.update_layout(yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("👋 請由上方上傳數據檔案進行分析。")
+        st.info("👋 請由左側側邊欄上傳數據。")

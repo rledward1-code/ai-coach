@@ -14,5 +14,41 @@
     {
         "timestamp": "2026-03-26 23:03:59",
         "summary": "📍 [數據總結]\n- 總距離: 1.36 km\n- 總時間: 23.63 分\n- 平均心率: 65 bpm\n- 有氧訓練效果 (TE): 0.0\n\n📊 [每公里分段摘要]\n- 第 1 km: N/A, 心率: 62"
+    },
+    {
+        "timestamp": "2026-03-27 23:41:26",
+        "summary": "📍 [基礎數據統計]\n(警告：未能辨識出關鍵數據，請檢查 CSV 標題列名是否包含里程、心率等關鍵字)"
+    },
+    {
+        "timestamp": "2026-03-27 23:51:13",
+        "summary": "解析檔案時發生錯誤: No columns to parse from file\nTraceback (most recent call last):\n  File \"C:\\Users\\Edward\\Desktop\\AI Coach\\data_processor.py\", line 17, in process_data\n    return _process_csv(file_path)\n  File \"C:\\Users\\Edward\\Desktop\\AI Coach\\data_processor.py\", line 52, in _process_csv\n    df = pd.read_csv(file_path, skiprows=range(0, 22), encoding='utf-8', on_bad_lines='skip')\n  File \"C:\\Users\\Edward\\Desktop\\AI Coach\\venv\\lib\\site-packages\\pandas\\io\\parsers\\readers.py\", line 1026, in read_csv\n    return _read(filepath_or_buffer, kwds)\n  File \"C:\\Users\\Edward\\Desktop\\AI Coach\\venv\\lib\\site-packages\\pandas\\io\\parsers\\readers.py\", line 620, in _read\n    parser = TextFileReader(filepath_or_buffer, **kwds)\n  File \"C:\\Users\\Edward\\Desktop\\AI Coach\\venv\\lib\\site-packages\\pandas\\io\\parsers\\readers.py\", line 1620, in __init__\n    self._engine = self._make_engine(f, self.engine)\n  File \"C:\\Users\\Edward\\Desktop\\AI Coach\\venv\\lib\\site-packages\\pandas\\io\\parsers\\readers.py\", line 1898, in _make_engine\n    return mapping[engine](f, **self.options)\n  File \"C:\\Users\\Edward\\Desktop\\AI Coach\\venv\\lib\\site-packages\\pandas\\io\\parsers\\c_parser_wrapper.py\", line 93, in __init__\n    self._reader = parsers.TextReader(src, **kwds)\n  File \"pandas/_libs/parsers.pyx\", line 581, in pandas._libs.parsers.TextReader.__cinit__\npandas.errors.EmptyDataError: No columns to parse from file\n"
+    },
+    {
+        "timestamp": "2026-03-28 00:00:40",
+        "summary": "📊 [CSV 解析成功：計圈數據詳情]\n- 訓練總距離: 5.68 km (計圈累計)\n- 第 1 圈: 配速 7:51, 心率 131 bpm\n- 第 2 圈: 配速 8:03, 心率 146 bpm\n- 第 3 圈: 配速 7:43, 心率 148 bpm\n- 第 4 圈: 配速 7:15, 心率 151 bpm\n- 第 5 圈: 配速 6:30, 心率 158 bpm\n- 第 6 圈: 配速 7:04, 心率 162 bpm"
+    },
+    {
+        "timestamp": "2026-03-28 08:27:37",
+        "summary": "📊 [CSV 解析成功：計圈數據詳情]\n- 訓練總距離: 5.68 km (計圈累計)\n- 第 1 圈: 配速 7:51, 心率 131 bpm, 坡度 3.0%, 海拔 233m\n- 第 2 圈: 配速 8:03, 心率 146 bpm, 坡度 3.4%, 海拔 274m\n- 第 3 圈: 配速 7:43, 心率 148 bpm, 坡度 3.6%, 海拔 277m\n- 第 4 圈: 配速 7:15, 心率 151 bpm, 坡度 3.6%, 海拔 285m\n- 第 5 圈: 配速 6:30, 心率 158 bpm, 坡度 3.6%, 海拔 316m\n- 第 6 圈: 配速 7:04, 心率 162 bpm, 坡度 4.0%, 海拔 294m"
+    },
+    {
+        "timestamp": "2026-03-28 08:44:26",
+        "summary": "📊 [CSV 解析成功：計圈數據詳情]\n- 訓練總距離: 1.36 km (計圈累計)\n- 第 1 圈: 配速 16:54, 心率 84 bpm, 海拔 150m\n- 第 2 圈: 配速 18:25, 心率 91 bpm, 海拔 113m"
+    },
+    {
+        "timestamp": "2026-03-28 08:47:58",
+        "summary": "📊 [CSV 解析成功：計圈數據詳情]\n- 訓練總距離: 21.26 km (計圈累計)\n- 第 1 圈: 配速 6:20, 心率 165 bpm, 坡度 3.8%, 海拔 294m\n- 第 2 圈: 配速 5:52, 心率 178 bpm, 坡度 4.0%, 海拔 292m\n- 第 3 圈: 配速 5:29, 心率 182 bpm, 坡度 4.2%, 海拔 274m\n- 第 4 圈: 配速 5:07, 心率 188 bpm, 坡度 4.5%, 海拔 288m\n- 第 5 圈: 配速 5:17, 心率 187 bpm, 坡度 4.3%, 海拔 274m\n- 第 6 圈: 配速 5:27, 心率 187 bpm, 坡度 4.3%, 海拔 285m\n- 第 7 圈: 配速 5:31, 心率 185 bpm, 坡度 4.3%, 海拔 295m\n- 第 8 圈: 配速 5:43, 心率 184 bpm, 坡度 4.1%, 海拔 282m\n- 第 9 圈: 配速 5:16, 心率 186 bpm, 坡度 4.5%, 海拔 306m\n- 第 10 圈: 配速 5:27, 心率 186 bpm, 坡度 4.4%, 海拔 285m\n- 第 11 圈: 配速 5:15, 心率 187 bpm, 坡度 4.5%, 海拔 278m\n- 第 12 圈: 配速 5:24, 心率 189 bpm, 坡度 4.2%, 海拔 282m\n- 第 13 圈: 配速 5:31, 心率 186 bpm, 坡度 4.4%, 海拔 311m\n- 第 14 圈: 配速 5:25, 心率 188 bpm, 坡度 4.4%, 海拔 288m\n- 第 15 圈: 配速 4:54, 心率 192 bpm, 坡度 4.8%, 海拔 310m\n- 第 16 圈: 配速 5:52, 心率 187 bpm, 坡度 3.9%, 海拔 333m\n- 第 17 圈: 配速 4:51, 心率 190 bpm, 坡度 4.7%, 海拔 335m\n- 第 18 圈: 配速 5:09, 心率 192 bpm, 坡度 4.4%, 海拔 291m\n- 第 19 圈: 配速 5:14, 心率 194 bpm, 坡度 4.6%, 海拔 314m\n- 第 20 圈: 配速 5:08, 心率 193 bpm, 坡度 4.4%, 海拔 277m\n- 第 21 圈: 配速 4:43, 心率 199 bpm, 坡度 4.9%, 海拔 314m\n- 第 22 圈: 配速 4:34, 心率 203 bpm, 坡度 5.0%, 海拔 376m"
+    },
+    {
+        "timestamp": "2026-03-28 09:28:28",
+        "summary": "📊 [CSV 解析成功：計圈數據詳情]\n- 訓練總距離: 5.68 km (計圈累計)\n- 第 1 圈: 配速 7:51, 心率 131 bpm, 坡度 3.0%, 海拔 233m\n- 第 2 圈: 配速 8:03, 心率 146 bpm, 坡度 3.4%, 海拔 274m\n- 第 3 圈: 配速 7:43, 心率 148 bpm, 坡度 3.6%, 海拔 277m\n- 第 4 圈: 配速 7:15, 心率 151 bpm, 坡度 3.6%, 海拔 285m\n- 第 5 圈: 配速 6:30, 心率 158 bpm, 坡度 3.6%, 海拔 316m\n- 第 6 圈: 配速 7:04, 心率 162 bpm, 坡度 4.0%, 海拔 294m"
+    },
+    {
+        "timestamp": "2026-03-28 09:29:06",
+        "summary": "解析檔案時發生異常: 'lap'"
+    },
+    {
+        "timestamp": "2026-03-28 09:32:40",
+        "summary": "📊 [CSV 解析成功：計圈數據詳情]\n- 訓練總距離: 17.65 km (計圈累計)\n- 第 1 圈: 配速 6:57, 心率 149 bpm, 坡度 3.5%, 海拔 265m\n- 第 2 圈: 配速 6:43, 心率 156 bpm, 坡度 3.8%, 海拔 261m\n- 第 3 圈: 配速 6:45, 心率 155 bpm, 坡度 3.7%, 海拔 347m\n- 第 4 圈: 配速 6:43, 心率 156 bpm, 坡度 3.5%, 海拔 272m\n- 第 5 圈: 配速 6:45, 心率 156 bpm, 坡度 3.6%, 海拔 244m\n- 第 6 圈: 配速 6:41, 心率 161 bpm, 坡度 3.6%, 海拔 229m\n- 第 7 圈: 配速 6:40, 心率 161 bpm, 坡度 3.6%, 海拔 267m\n- 第 8 圈: 配速 6:42, 心率 160 bpm, 坡度 3.5%, 海拔 221m\n- 第 9 圈: 配速 6:58, 心率 161 bpm, 坡度 3.6%, 海拔 267m\n- 第 10 圈: 配速 9:01, 心率 160 bpm, 坡度 2.6%, 海拔 275m\n- 第 11 圈: 配速 6:24, 心率 160 bpm, 坡度 3.7%, 海拔 243m\n- 第 12 圈: 配速 6:25, 心率 158 bpm, 坡度 3.7%, 海拔 278m\n- 第 13 圈: 配速 6:09, 心率 152 bpm, 坡度 3.8%, 海拔 239m\n- 第 14 圈: 配速 6:11, 心率 157 bpm, 坡度 3.9%, 海拔 259m\n- 第 15 圈: 配速 6:26, 心率 157 bpm, 坡度 3.8%, 海拔 302m\n- 第 16 圈: 配速 6:07, 心率 153 bpm, 坡度 3.9%, 海拔 324m\n- 第 17 圈: 配速 6:11, 心率 158 bpm, 坡度 3.8%, 海拔 322m\n- 第 18 圈: 配速 6:11, 心率 158 bpm, 坡度 4.0%, 海拔 261m"
     }
 ]
