@@ -124,14 +124,11 @@ def stream_pace(api_key, user_profile, luger_analysis, summary, user_input="", p
         # GPT 會以為那些都是「佩絲說的」，進而開始扮演路格（雙重人格）
         if history:
             for msg in history:
-                if msg["role"] == "user":
-                    chat_messages.append({"role": "user", "content": msg["content"]})
-                else:  # 路格說過的 → 包進 user 角色，標明出處
-                    chat_messages.append({"role": "user", "content": f"（路格說：）{msg['content']}"})
+                chat_messages.append({"role": msg["role"], "content": msg["content"]})
 
         # 本輪當前訊息
         if luger_analysis:
-            chat_messages.append({"role": "assistant", "content": f"（路格剛才說：）{luger_analysis}"})
+            chat_messages.append({"role": "user", "content": f"（路格剛才說：）{luger_analysis}"})
 
         chat_messages.append({
             "role": "user",
