@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 from data_processor import process_data
 from coach_engine import stream_luger, stream_pace, determine_rounds, determine_speakers
 from history_manager import save_run_to_history, get_history_snapshot, save_chat_log, load_chat_log
+from memory_manager import sync_memory_store, get_relevant_memories
 
 # --- 1. Session State 初始化 ---
 if "messages" not in st.session_state:
@@ -147,7 +148,25 @@ def trigger_coach_responses(user_input, data_summary, container):
     if pace_history: pace_history = pace_history[:-1]
 
     history_context = get_history_snapshot()
-    full_cv = f"{history_context}\n\n[本次任務數據]:\n{data_summary if data_summary else '目前無上傳數據'}"
+    memory_context = ""
+    if keys.get("OPENAI_API_KEY", ""):
+        try:
+            sync_memory_store(keys.get("OPENAI_API_KEY", ""))
+            memory_context = get_relevant_memories(
+                keys.get("OPENAI_API_KEY", ""),
+                f"{user_input}\n{history_context}",
+                top_k=4,
+            )
+        except Exception:
+            memory_context = ""
+
+    if memory_context:
+        full_cv = (
+            f"{history_context}\n\n[相關記憶]:\n{memory_context}\n\n"
+            f"[本次任務數據]:\n{data_summary if data_summary else '目前無上傳數據'}"
+        )
+    else:
+        full_cv = f"{history_context}\n\n[本次任務數據]:\n{data_summary if data_summary else '目前無上傳數據'}"
 
     g_key, o_key = keys.get("GEMINI_API_KEY", ""), keys.get("OPENAI_API_KEY", "")
     
