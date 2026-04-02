@@ -7,13 +7,17 @@ HISTORY_FILE = "coach_history.json"
 CHAT_LOG_FILE = "chat_log.json"
 MAX_CHAT_MESSAGES = 100  # 設定保留最近 100 則訊息 (約 30-50 輪對話)
 
-def save_run_to_history(summary_text):
+def save_run_to_history(summary_text, tags=None, rpe=None, feeling=None, plan=None):
     """將每次解析完的跑步摘要存入歷史紀錄，最多保留最近 20 筆"""
     history = load_history()
     
     entry = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "summary": summary_text
+        "summary": summary_text,
+        "tags": tags or [],
+        "rpe": rpe,
+        "feeling": feeling,
+        "plan": plan
     }
     
     # 避免重複存入同一筆 (簡單比對摘要內容)
@@ -50,7 +54,12 @@ def get_history_snapshot():
     for h in history[-5:]:
         # 擷取摘要中的關鍵行 (例如 總距離, 總時間)
         first_lines = [line for line in h["summary"].split("\n")][:5]
-        lines.append(f"📅 {h['timestamp']}: {' | '.join(first_lines)}")
+        tag_str = f" [{', '.join(h.get('tags', []))}]" if h.get('tags') else ""
+        
+        # 加入體感與計畫描述
+        rpe = h.get('rpe', 'N/A')
+        plan = h.get('plan', '未記錄')
+        lines.append(f"📅 {h['timestamp']}: {' | '.join(first_lines)}{tag_str} (RPE: {rpe}, 計畫: {plan})")
         
     return "\n".join(lines)
 

@@ -28,7 +28,7 @@ if not exist "venv\Scripts\python.exe" (
 if exist "requirements.txt" (
     echo [系統] 正在安裝必要套件...
     "venv\Scripts\python.exe" -m pip install --upgrade pip
-    "venv\Scripts\pip.exe" install -r requirements.txt
+    "venv\Scripts\python.exe" -m pip install -r requirements.txt
 ) else (
     echo [警告] 找不到 requirements.txt，將跳過安裝步驟。
 )
@@ -37,6 +37,6 @@ if exist "requirements.txt" (
 echo.
 echo [成功] 準備完成，正在喚醒路格與佩絲教練...
 echo ========================================================
-"venv\Scripts\streamlit.exe" run app.py
+"venv\Scripts\python.exe" -m streamlit run app.py
 
 pause

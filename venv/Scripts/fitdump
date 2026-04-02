@@ -1,4 +1,4 @@
-#!C:\Users\Edward\Desktop\AI Coach\venv\Scripts\python.exe
+#!E:\ai-coach\venv\Scripts\python.exe
 from __future__ import print_function
 
 import argparse

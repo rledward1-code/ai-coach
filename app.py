@@ -20,6 +20,14 @@ if "pending_summary" not in st.session_state:
     st.session_state.pending_summary = ""
 if "pending_file_name" not in st.session_state:
     st.session_state.pending_file_name = ""
+if "pending_tags" not in st.session_state:
+    st.session_state.pending_tags = []
+if "pending_rpe" not in st.session_state:
+    st.session_state.pending_rpe = 5
+if "pending_feeling" not in st.session_state:
+    st.session_state.pending_feeling = "普通"
+if "pending_plan" not in st.session_state:
+    st.session_state.pending_plan = ""
 
 # --- 2. 金鑰管理 ---
 def load_keys():
@@ -70,15 +78,39 @@ with st.sidebar:
         save_path = f"temp.{file_ext}"
         with open(save_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
-        df, summary, _ = process_data(save_path)
+        df, summary, _, tags = process_data(save_path)
         st.session_state.df = df
         st.session_state.pending_summary = summary
+        st.session_state.pending_tags = tags
         st.session_state.pending_file_name = uploaded_file.name
-        save_run_to_history(summary)
+        save_run_to_history(
+            summary, 
+            tags=tags, 
+            rpe=st.session_state.pending_rpe, 
+            feeling=st.session_state.pending_feeling, 
+            plan=st.session_state.pending_plan
+        )
 
     if st.session_state.pending_file_name:
         st.success(f"✅ {st.session_state.pending_file_name}")
-        st.caption("輸入訊息即可發送分析。")
+        
+        with st.expander("📝 補充本次訓練報告", expanded=True):
+            st.session_state.pending_rpe = st.slider("🏃 體感強度 (RPE)", 1, 10, st.session_state.pending_rpe, help="1最輕鬆, 10極限辛苦")
+            st.session_state.pending_feeling = st.select_slider("🧠 身體感受", options=["極差", "疲累", "普通", "良好", "神清氣爽"], value=st.session_state.pending_feeling)
+            st.session_state.pending_plan = st.text_input("📋 原定計畫描述", placeholder="例如: 輕鬆跑 10K 或 6x800 間歇", value=st.session_state.pending_plan)
+            
+            if st.button("💾 更新訓練紀錄", use_container_width=True):
+                # 重新儲存一次歷史紀錄 (覆蓋前一秒剛存的那筆)
+                save_run_to_history(
+                    st.session_state.pending_summary, 
+                    tags=st.session_state.pending_tags,
+                    rpe=st.session_state.pending_rpe,
+                    feeling=st.session_state.pending_feeling,
+                    plan=st.session_state.pending_plan
+                )
+                st.toast("訓練詳情已同步至紀錄！")
+
+        st.caption("輸入訊息即可發送完整分析。")
 
 # --- 5. CSS 注入 ---
 st.markdown("""
@@ -148,6 +180,10 @@ def trigger_coach_responses(user_input, data_summary, container):
     if pace_history: pace_history = pace_history[:-1]
 
     history_context = get_history_snapshot()
+    tag_info = f" [標籤: {', '.join(st.session_state.pending_tags)}]" if st.session_state.get('pending_tags') else ""
+    # 注入本次訓練的體感資訊
+    session_report = f"\n[跑者體感回報]: RPE {st.session_state.pending_rpe}, 感受: {st.session_state.pending_feeling}, 原定計畫: {st.session_state.pending_plan if st.session_state.pending_plan else '未註明'}"
+    full_cv = f"{history_context}\n\n[本次任務數據{tag_info}]:{session_report}\n\n{data_summary if data_summary else '目前無上傳數據'}"    
     memory_context = ""
     if keys.get("OPENAI_API_KEY", ""):
         try:
@@ -342,8 +378,10 @@ with tab1:
 
         if st.session_state.pending_summary:
             this_turn_summary = st.session_state.pending_summary
-            final_content = f"📎 [附件: {st.session_state.pending_file_name}]\n\n{user_input}"
+            tags_display = f" [{', '.join(st.session_state.pending_tags)}]" if st.session_state.pending_tags else ""
+            final_content = f"📎 [附件: {st.session_state.pending_file_name}]{tags_display}\n\n{user_input}"
             st.session_state.pending_summary = ""
+            st.session_state.pending_tags = []
 
         st.session_state.messages.append({"role": "user", "name": "Edward", "avatar": "assets/Edward.png", "content": final_content, "time": now_str})
 

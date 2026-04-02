@@ -61,6 +61,14 @@ def stream_luger(api_key, history, user_profile, summary, user_input, prev_pace_
             gemini_models = [m for m in available if "gemini" in m]
             target = gemini_models[0] if gemini_models else "models/gemini-pro"
 
+        # 設定安全過濾門檻為最低，避免跑步數據誤觸
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
+
         clean_summary = str(summary)[:2000] if summary else "目前無數據"
         system_prompt = prompts.LUGER_SYSTEM_PROMPT.format(
             user_profile=user_profile,
@@ -68,7 +76,11 @@ def stream_luger(api_key, history, user_profile, summary, user_input, prev_pace_
         )
 
         # 使用 system_instruction 避免 Gemini 的 user/model 交替限制
-        model = genai.GenerativeModel(target, system_instruction=system_prompt)
+        model = genai.GenerativeModel(
+            target, 
+            system_instruction=system_prompt,
+            safety_settings=safety_settings
+        )
 
         # 確保 history 嚴格交替 user/model，避免 InvalidArgument
         messages = []
@@ -96,8 +108,16 @@ def stream_luger(api_key, history, user_profile, summary, user_input, prev_pace_
 
         response = model.generate_content(messages, stream=True)
         for chunk in response:
-            if chunk.text:
-                yield chunk.text
+            try:
+                # 檢查是否有被安全擋住
+                if chunk.candidates[0].finish_reason == 3: # SAFETY
+                    yield "⚠️ [路格提示：此段對話內容因安全機制被攔截，請嘗試調整問題詞彙]"
+                    break
+                if chunk.text:
+                    yield chunk.text
+            except Exception:
+                # 如果快取存取失敗（例如 finish_reason=1/3），跳過此次輸出
+                continue
 
     except Exception as e:
         yield f"路格診斷發生錯誤: {str(e)}"

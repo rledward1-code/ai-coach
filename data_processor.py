@@ -145,7 +145,7 @@ def _apply_standard_processing(df, session_data):
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
     # 生成摘要文字
-    lines = ["📊 [CSV 解析成功：計圈跑姿數據]"]
+    lines = ["📊 [數據解析成功：計圈跑姿數據]"]
     if 'dist_km' in df.columns:
         lines.append(f"- 訓練總距離: {df['dist_km'].sum():.2f} km")
 
@@ -183,10 +183,30 @@ def _apply_standard_processing(df, session_data):
 
         lines.append(f"- 第 {lap} 圈: " + ", ".join(parts))
 
+    # --- 自動標籤邏輯 ---
+    tags = []
+    if 'dist_km' in df.columns:
+        total_dist = df['dist_km'].sum()
+        if total_dist > 15: tags.append("#長距離")
+        elif total_dist > 8: tags.append("#普通跑")
+        else: tags.append("#短程訓練")
+    
+    # 判斷間歇: 若圈數 > 3 且配速波動大
+    if len(df) > 3 and 'pace' in df.columns:
+        pace_std = df['pace'].std()
+        if pace_std > 0.5: # 0.5 min/km = 30s/km fluctuation
+            tags.append("#間歇跑")
+    
+    # 判斷強度: 若平均心率 > 160
+    if 'heart_rate' in df.columns and df['heart_rate'].mean() > 160:
+        tags.append("#高強度")
+    elif 'heart_rate' in df.columns and df['heart_rate'].mean() < 130:
+        tags.append("#恢復跑")
+
     summary = "\n".join(lines)
     metrics = {
         'heart_rate': '心率', 'pace': '配速',
         'cadence': '步頻', 'gct': '觸地時間',
         'vertical_osc': '垂直震幅', 'grade': '坡度'
     }
-    return df, summary, metrics
+    return df, summary, metrics, tags
