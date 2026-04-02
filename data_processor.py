@@ -13,9 +13,9 @@ def process_data(file_path):
         elif ext == ".csv":
             return _process_csv(file_path)
         else:
-            return pd.DataFrame(), f"不支援的檔案格式: {ext}", {}
+            return pd.DataFrame(), f"不支援的檔案格式: {ext}", {}, []
     except Exception as e:
-        return pd.DataFrame(), f"解析檔案時發生異常: {str(e)}", {}
+        return pd.DataFrame(), f"解析檔案時發生異常: {str(e)}", {}, []
 
 def _process_fit(file_path):
     fitfile = FitFile(file_path)
@@ -65,13 +65,13 @@ def _process_csv(file_path):
         raw_df = pd.read_csv(file_path, header=None, encoding='big5', on_bad_lines='skip')
 
     if raw_df.empty:
-        return pd.DataFrame(), "CSV 檔案為空", {}
+        return pd.DataFrame(), "CSV 檔案為空", {}, []
 
     # 找數據起點
     mask = raw_df[0].astype(str).str.strip().str.replace('"', '', regex=False) == "1"
     start_indices = raw_df.index[mask].tolist()
     if not start_indices:
-        return pd.DataFrame(), "無法在 CSV 中找到計圈數據起點（找不到第 1 圈）", {}
+        return pd.DataFrame(), "無法在 CSV 中找到計圈數據起點（找不到第 1 圈）", {}, []
     start_row = start_indices[0]
 
     # 向前找 header 行：從 start_row-1 往上，取最近的非空、非數字行
@@ -109,7 +109,7 @@ def _process_csv(file_path):
 
 def _apply_standard_processing(df, session_data):
     if df.empty:
-        return df, "解析後數據為空", {}
+        return df, "解析後數據為空", {}, []
 
     def clean_val(x):
         if pd.isna(x): return x
@@ -210,3 +210,79 @@ def _apply_standard_processing(df, session_data):
         'vertical_osc': '垂直震幅', 'grade': '坡度'
     }
     return df, summary, metrics, tags
+
+def process_history_summary(file_path):
+    """處理 Garmin 匯出的活動清單總表 (每列一個活動)"""
+    try:
+        try:
+            df = pd.read_csv(file_path, encoding='utf-8')
+        except:
+            df = pd.read_csv(file_path, encoding='big5')
+
+        if df.empty:
+            return "檔案內容為空"
+
+        # 欄位標準化 (Garmin 常用)
+        mapping = {
+            'Activity Type': 'type', '活動類型': 'type',
+            'Date': 'date', '日期': 'date',
+            'Distance': 'dist', '距離': 'dist',
+            'Calories': 'cal', '卡路里': 'cal',
+            'Time': 'time', '時間': 'time',
+            'Avg HR': 'hr', '平均心率': 'hr',
+            'Avg Pace': 'pace', '平均配速': 'pace',
+            'Elev Gain': 'elev', '高度增加': 'elev'
+        }
+        df = df.rename(columns=mapping)
+        
+        # 只取跑步 (包含 Run, Street Running, Trail Running 等)
+        run_keywords = ['run', '跑', '跑步']
+        if 'type' in df.columns:
+            df = df[df['type'].astype(str).str.lower().str.contains('|'.join(run_keywords), na=False)]
+
+        if df.empty:
+            return "在總表中找不到任何跑步活動"
+
+        # 轉換距離與日期
+        df['dist'] = pd.to_numeric(df['dist'], errors='coerce')
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df = df.dropna(subset=['date', 'dist'])
+        df = df.sort_values('date', ascending=False)
+
+        # 計算統計資訊
+        total_runs = len(df)
+        total_dist = df['dist'].sum()
+        
+        last_30_days = df[df['date'] > (pd.Timestamp.now() - pd.Timedelta(days=30))]
+        monthly_dist = last_30_days['dist'].sum()
+        avg_hr = df['hr'].astype(str).str.replace('--', '0').replace('', '0').astype(float, errors='ignore')
+        avg_hr = pd.to_numeric(avg_hr, errors='coerce').mean()
+        
+        # 額外提取：最近 5 次跑步明細
+        recent_list = []
+        for _, row in df.head(5).iterrows():
+            d_str = row['date'].strftime('%m/%d')
+            recent_list.append(f"{d_str}: {row['dist']}km (配速: {row.get('pace','?')})")
+        recent_str = "\n  ".join(recent_list)
+
+        # 額外提取：跑者成就
+        max_dist = df['dist'].max()
+        best_pace = "N/A"
+        if 'pace' in df.columns:
+            # 這裡簡單取最快的一筆 (需注意格式)
+            best_pace = df['pace'].sort_values().iloc[0]
+
+        summary_text = f"""
+【跑者長期訓練總表 - 深度分析檔案】
+- 數據涵蓋期間: {df['date'].min().strftime('%Y/%m/%d')} ~ {df['date'].max().strftime('%Y/%m/%d')}
+- 歷史總跑步: {total_runs} 次 / 總里程: {total_dist:.1f} km
+- 最近 30 天訓練量: {monthly_dist:.1f} km
+- 歷史平均心率: {avg_hr:.0f} bpm
+- 歷史單次最長距離: {max_dist:.1f} km
+- 最佳配速參考: {best_pace}
+- 最近 5 次練跑紀錄:
+  {recent_str}
+        """
+        return summary_text
+    except Exception as e:
+        return f"解析總表失敗: {str(e)}"

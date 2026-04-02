@@ -51,8 +51,8 @@ def determine_speakers(api_key, user_input, has_data=False):
             return ["luger", "pace"]
         return ["pace", "luger"]
 
-def stream_luger(api_key, history, user_profile, summary, user_input, prev_pace_response=""):
-    """路格回應。prev_pace_response 是佩絲上一輪說的話（多輪對話使用）。"""
+def stream_luger(api_key, history, user_profile, current_summary, global_history, user_input, prev_pace_response=""):
+    """路格回應。"""
     try:
         genai.configure(api_key=api_key.strip())
         available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -69,9 +69,12 @@ def stream_luger(api_key, history, user_profile, summary, user_input, prev_pace_
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
 
-        clean_summary = str(summary)[:2000] if summary else "目前無數據"
+        clean_summary = str(current_summary)[:2000] if current_summary else "目前無本次任務數據"
+        gh_summary = str(global_history)[:2000] if global_history else "目前無長期歷史數據"
+
         system_prompt = prompts.LUGER_SYSTEM_PROMPT.format(
             user_profile=user_profile,
+            global_history=gh_summary,
             clean_summary=clean_summary
         )
 
@@ -122,17 +125,16 @@ def stream_luger(api_key, history, user_profile, summary, user_input, prev_pace_
     except Exception as e:
         yield f"路格診斷發生錯誤: {str(e)}"
 
-def stream_pace(api_key, user_profile, luger_analysis, summary, user_input="", prev_luger_response="", history=None):
-    """
-    佩絲回應。history 是過去的對話記錄（與 luger_history 相同格式），
-    使佩絲能讀到過去 Edward 與路格的完整對話。
-    """
+def stream_pace(api_key, user_profile, luger_analysis, current_summary, global_history, user_input="", prev_luger_response="", history=None):
+    """佩絲回應。"""
     try:
         client = OpenAI(api_key=api_key.strip())
-        clean_summary = str(summary)[:2000] if summary else "目前無數據"
+        clean_summary = str(current_summary)[:2000] if current_summary else "目前無本次任務數據"
+        gh_summary = str(global_history)[:2000] if global_history else "目前無長期歷史數據"
 
         system_content = prompts.PACE_SYSTEM_PROMPT.format(
             user_profile=user_profile,
+            global_history=gh_summary,
             clean_summary=clean_summary
         )
 
