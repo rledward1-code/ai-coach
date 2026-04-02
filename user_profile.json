@@ -1,0 +1,8 @@
+{
+  "name": "Edward",
+  "age": 56,
+  "gender": "男",
+  "max_hr": 210,
+  "rest_hr": 56,
+  "threshold_hr": 193
+}
