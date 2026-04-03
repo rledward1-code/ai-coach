@@ -3,10 +3,13 @@ import json
 import os
 from datetime import datetime
 
-HISTORY_FILE = "coach_history.json"
-CHAT_LOG_FILE = "chat_log.json"
-GLOBAL_HISTORY_FILE = "global_history_summary.txt"
-USER_PROFILE_FILE = "user_profile.json"
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+HISTORY_FILE = os.path.join(DATA_DIR, "coach_history.json")
+CHAT_LOG_FILE = os.path.join(DATA_DIR, "chat_log.json")
+GLOBAL_HISTORY_FILE = os.path.join(DATA_DIR, "global_history_summary.txt")
+USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
 MAX_CHAT_MESSAGES = 100  # 設定保留最近 100 則訊息 (約 30-50 輪對話)
 
 def save_run_to_history(summary_text, tags=None, rpe=None, feeling=None, plan=None):
@@ -22,8 +25,14 @@ def save_run_to_history(summary_text, tags=None, rpe=None, feeling=None, plan=No
         "plan": plan
     }
     
-    # 避免重複存入同一筆 (簡單比對摘要內容)
+    # 避免重複存入同一筆，但更新 RPE、Feeling 等補充資訊
     if history and history[-1]["summary"] == summary_text:
+        history[-1]["tags"] = tags or []
+        if rpe is not None: history[-1]["rpe"] = rpe
+        if feeling is not None: history[-1]["feeling"] = feeling
+        if plan is not None: history[-1]["plan"] = plan
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=4)
         return
         
     history.append(entry)

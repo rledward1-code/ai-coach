@@ -18,17 +18,20 @@ if "%errorlevel%" neq "0" (
     exit /b
 )
 
+:: 使用電腦名稱建立專屬虛擬環境，避免兩台電腦同步時互蓋
+set VENV_DIR=venv_%COMPUTERNAME%
+
 :: 2. 建立/啟動虛擬環境
-if not exist "venv\Scripts\python.exe" (
-    echo [系統] 首次執行，正在建立虛擬環境...
-    python -m venv venv
+if not exist "%VENV_DIR%\Scripts\python.exe" (
+    echo [系統] 首次執行或換電腦，正在建立專屬虛擬環境 [%VENV_DIR%] ...
+    python -m venv "%VENV_DIR%"
 )
 
 :: 3. 安裝零件 (確保 requirements.txt 在同一層)
 if exist "requirements.txt" (
     echo [系統] 正在安裝必要套件...
-    "venv\Scripts\python.exe" -m pip install --upgrade pip
-    "venv\Scripts\python.exe" -m pip install -r requirements.txt
+    "%VENV_DIR%\Scripts\python.exe" -m pip install --upgrade pip
+    "%VENV_DIR%\Scripts\python.exe" -m pip install -r requirements.txt
 ) else (
     echo [警告] 找不到 requirements.txt，將跳過安裝步驟。
 )
@@ -37,6 +40,6 @@ if exist "requirements.txt" (
 echo.
 echo [成功] 準備完成，正在喚醒路格與佩絲教練...
 echo ========================================================
-"venv\Scripts\python.exe" -m streamlit run app.py
+"%VENV_DIR%\Scripts\python.exe" -m streamlit run app.py
 
 pause

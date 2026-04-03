@@ -7,7 +7,10 @@ from openai import OpenAI
 
 from history_manager import load_history, load_chat_log
 
-MEMORY_STORE_FILE = "memory_store.json"
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+MEMORY_STORE_FILE = os.path.join(DATA_DIR, "memory_store.json")
 EMBEDDING_MODEL = "text-embedding-3-small"
 MAX_CHAT_TURNS = 40
 MAX_HISTORY_ITEMS = 20

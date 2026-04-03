@@ -23,6 +23,22 @@ def determine_rounds(api_key, user_input):
     except:
         return 1  # 失敗時保守返回 1 輪，避免重複
 
+def determine_intent(api_key, user_input, has_data=False):
+    """判斷使用者的意圖：CHAT / DATA / HISTORY"""
+    try:
+        model = _get_gemini_model(api_key)
+        prompt = prompts.INTENT_JUDGE_PROMPT.format(
+            user_input=user_input, 
+            has_data="是" if has_data else "否"
+        )
+        resp = model.generate_content(prompt)
+        text = resp.text.strip().upper()
+        if "CHAT" in text: return "CHAT"
+        if "HISTORY" in text: return "HISTORY"
+        return "DATA"
+    except:
+        return "DATA" if has_data else "CHAT"
+
 def determine_speakers(api_key, user_input, has_data=False):
     """
     判斷誰應該回應這條訊息。
@@ -69,8 +85,8 @@ def stream_luger(api_key, history, user_profile, current_summary, global_history
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
 
-        clean_summary = str(current_summary)[:2000] if current_summary else "目前無本次任務數據"
-        gh_summary = str(global_history)[:2000] if global_history else "目前無長期歷史數據"
+        clean_summary = str(current_summary)[:30000] if current_summary else "目前無本次任務數據"
+        gh_summary = str(global_history)[:30000] if global_history else "目前無長期歷史數據"
 
         system_prompt = prompts.LUGER_SYSTEM_PROMPT.format(
             user_profile=user_profile,
@@ -100,7 +116,7 @@ def stream_luger(api_key, history, user_profile, current_summary, global_history
         profile_reminder = f"[重要：跑者基本資訊 - {user_profile}]"
         current_input = f"{profile_reminder}\n\n問題：{user_input}"
         if prev_pace_response:
-            current_input += f"\n\n（佩絲剛才說：{prev_pace_response}  ——你有什麼要補充或反駁的嗎？）"
+            current_input += f"\n\n（你的同行教練佩絲剛才說：{prev_pace_response}  ——[系統強制指令]：這代表佩絲已經回答過了。請你不要再像鸚鵡一樣確認收到檔案或重述一次相同的數據結論！請直接給出截然不同的教練切入方向或反駁她。）"
 
         # 如果 history 最後是 user，合併進去；否則新增一條
         # 這樣可以防止連續 user 訊息（round 2+ 時 history 最後常是 user）
@@ -129,8 +145,8 @@ def stream_pace(api_key, user_profile, luger_analysis, current_summary, global_h
     """佩絲回應。"""
     try:
         client = OpenAI(api_key=api_key.strip())
-        clean_summary = str(current_summary)[:2000] if current_summary else "目前無本次任務數據"
-        gh_summary = str(global_history)[:2000] if global_history else "目前無長期歷史數據"
+        clean_summary = str(current_summary)[:30000] if current_summary else "目前無本次任務數據"
+        gh_summary = str(global_history)[:30000] if global_history else "目前無長期歷史數據"
 
         system_content = prompts.PACE_SYSTEM_PROMPT.format(
             user_profile=user_profile,
@@ -154,7 +170,7 @@ def stream_pace(api_key, user_profile, luger_analysis, current_summary, global_h
 
         chat_messages.append({
             "role": "user",
-            "content": f"[重要：跑者基本資訊 - {user_profile}]\n\nEdward 說：{user_input}\n\n請根據對話自然地接話。"
+            "content": f"[重要：跑者基本資訊 - {user_profile}]\n\nEdward 說：{user_input}\n\n[系統強制指令]：如果路格剛才已經講過（或確認收到數據、分析過某些數據），你絕對不要再說一次「我收到了」或是重複結論！請直接給予感性支持或不同的切入點來接續話題。"
         })
 
         stream = client.chat.completions.create(

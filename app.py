@@ -7,7 +7,7 @@ import random
 from datetime import datetime
 import plotly.graph_objects as go
 from data_processor import process_data, process_history_summary
-from coach_engine import stream_luger, stream_pace, determine_rounds, determine_speakers
+from coach_engine import stream_luger, stream_pace, determine_rounds, determine_speakers, determine_intent
 from history_manager import (
     save_run_to_history, get_history_snapshot, save_chat_log, load_chat_log, 
     save_global_history, load_global_history, save_user_profile, load_user_profile
@@ -26,7 +26,7 @@ if "pending_file_name" not in st.session_state:
 if "pending_tags" not in st.session_state:
     st.session_state.pending_tags = []
 if "pending_rpe" not in st.session_state:
-    st.session_state.pending_rpe = 5
+    st.session_state.pending_rpe = "5 (有點吃力)"
 if "pending_feeling" not in st.session_state:
     st.session_state.pending_feeling = "普通"
 if "pending_plan" not in st.session_state:
@@ -78,6 +78,40 @@ st.markdown("""
     [data-testid="stChatMessage"] img:hover {
         transform: scale(2.5) !important; z-index: 9999 !important; position: relative;
     }
+    /* 極限壓縮對話框垂直留白與字體 */
+    [data-testid="stChatMessage"] {
+        font-size: 0.85rem !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0rem !important;
+    }
+    [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li {
+        font-size: 0.85rem !important;
+        line-height: 1.5 !important;
+        margin-bottom: 0.2rem !important;
+    }
+    /* 消除時間/垃圾桶列的浪費高度 */
+    [data-testid="stChatMessage"] [data-testid="stHorizontalBlock"] {
+        margin-top: -1rem !important;
+        margin-bottom: -1rem !important;
+        align-items: center !important;
+    }
+    [data-testid="stChatMessage"] .stButton button {
+        min-height: 1.8rem !important;
+        height: 1.8rem !important;
+        padding: 0 0.5rem !important;
+        line-height: 1 !important;
+    }
+    /* 縮小側邊欄字體 */
+    [data-testid="stSidebar"] p, 
+    [data-testid="stSidebar"] span, 
+    [data-testid="stSidebar"] input, 
+    [data-testid="stSidebar"] div[data-baseweb="select"] {
+        font-size: 0.85rem !important;
+    }
+    [data-testid="stSidebar"] h2 {
+        font-size: 1.15rem !important;
+        padding-bottom: 0.5rem !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -86,21 +120,21 @@ with st.sidebar:
     # 載入持久化設定
     p_data = load_user_profile()
 
-    c1, c2 = st.columns([0.8, 0.2])
-    with c1:
-        st.header("👤 個人資料")
-    with c2:
-        st.write("") # 稍微對齊
-        if st.button("📊", help="上傳歷史總表"):
-            upload_history_dialog()
+    with st.expander("👤 跑者個人資料與設定", expanded=False):
+        c1, c2 = st.columns([0.8, 0.2])
+        with c1:
+            st.caption("更新數值或上傳大歷史總表")
+        with c2:
+            if st.button("📊", help="上傳歷史總表"):
+                upload_history_dialog()
 
-    u_name = st.text_input("跑者姓名", value=p_data.get("name", "Edward"))
-    u_age = st.number_input("年齡", value=p_data.get("age", 56))
-    u_gender = st.selectbox("性別", ["男", "女", "其他"], index=["男", "女", "其他"].index(p_data.get("gender", "男")))
-    h1, h2, h3 = st.columns(3)
-    u_max_hr = h1.number_input("最大心率", value=p_data.get("max_hr", 210))
-    u_rest_hr = h2.number_input("靜息心率", value=p_data.get("rest_hr", 56))
-    u_threshold_hr = h3.number_input("閾值心率", value=p_data.get("threshold_hr", 193))
+        u_name = st.text_input("跑者姓名", value=p_data.get("name", "Edward"))
+        u_age = st.number_input("年齡", value=p_data.get("age", 56))
+        u_gender = st.selectbox("性別", ["男", "女", "其他"], index=["男", "女", "其他"].index(p_data.get("gender", "男")))
+        h1, h2, h3 = st.columns(3)
+        u_max_hr = h1.number_input("最大心率", value=p_data.get("max_hr", 210))
+        u_rest_hr = h2.number_input("靜息心率", value=p_data.get("rest_hr", 56))
+        u_threshold_hr = h3.number_input("閾值心率", value=p_data.get("threshold_hr", 193))
     
     # 組裝與即時儲存
     user_profile = f"跑者 ({u_name}): {u_age}歲{u_gender}, 最大心率: {u_max_hr}, 靜息: {u_rest_hr}, 閾值: {u_threshold_hr}"
@@ -114,7 +148,39 @@ with st.sidebar:
     })
 
     st.divider()
-    st.subheader("📎 上傳訓練數據")
+    import strava_manager
+    st.subheader("📎 訓練數據同步")
+    
+    # URL 參數攔截 (OAuth Callback)
+    query_params = st.query_params
+    if "code" in query_params:
+        code = query_params["code"]
+        st.query_params.clear()  # 🌟 取得後立刻清空網址，防止重新整理重複觸發！
+        success, msg = strava_manager.exchange_code_for_token(code)
+        if success:
+            st.success("✅ Strava 授權成功！請放心使用。")
+        else:
+            st.error(msg)
+            
+    if strava_manager.check_strava_ready():
+        if not strava_manager.is_strava_authorized():
+            auth_url = strava_manager.get_strava_auth_url()
+            st.markdown(f"**[👉 點擊這裡授權綁定 Strava]({auth_url})**")
+        else:
+            if st.button("🚀 從 Strava 抓取最新訓練", use_container_width=True):
+                with st.spinner("同步中..."):
+                    summary, filename, tags = strava_manager.fetch_latest_run()
+                    if summary:
+                        st.session_state.pending_summary = summary
+                        st.session_state.pending_file_name = filename
+                        st.session_state.pending_tags = tags
+                        st.success("✅ 訓練同步完畢！請直接送出對話，教練就會開始分析。")
+                    else:
+                        st.error(filename)
+    else:
+        st.info("請於 keys.json 中設定 STRAVA_CLIENT_ID 啟用串接。")
+
+    st.markdown("<div style='text-align: center; color: #888; font-size: 0.8rem; margin: 10px 0;'>— OR 手動上傳 —</div>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader("FIT / CSV", type=["fit", "csv"], label_visibility="collapsed")
     if uploaded_file and uploaded_file.name != st.session_state.pending_file_name:
         file_ext = uploaded_file.name.split(".")[-1].lower()
@@ -138,8 +204,18 @@ with st.sidebar:
         st.success(f"✅ {st.session_state.pending_file_name}")
         
         with st.expander("📝 補充本次訓練報告", expanded=True):
-            st.session_state.pending_rpe = st.slider("🏃 體感強度 (RPE)", 1, 10, st.session_state.pending_rpe, help="1最輕鬆, 10極限辛苦")
-            st.session_state.pending_feeling = st.select_slider("🧠 身體感受", options=["極差", "疲累", "普通", "良好", "神清氣爽"], value=st.session_state.pending_feeling)
+            # 陣列化 RPE 提供詳細說明
+            rpe_options = [
+                "1 (極輕鬆)", "2 (很輕鬆)", "3 (輕鬆)", "4 (微喘)", 
+                "5 (有點吃力)", "6 (吃力)", "7 (很吃力)", 
+                "8 (非常吃力)", "9 (極度極限)", "10 (筋疲力盡)"
+            ]
+            current_rpe = st.session_state.pending_rpe
+            # 相容原本是整數的狀態
+            if isinstance(current_rpe, int):
+                current_rpe = rpe_options[current_rpe - 1] if 1 <= current_rpe <= 10 else "5 (有點吃力)"
+            st.session_state.pending_rpe = st.select_slider("🏃 身體強度 (RPE)", options=rpe_options, value=current_rpe)
+            st.session_state.pending_feeling = st.select_slider("🧠 心理感受", options=["極差", "疲累", "普通", "良好", "神清氣爽"], value=st.session_state.pending_feeling)
             st.session_state.pending_plan = st.text_input("📋 原定計畫描述", placeholder="例如: 輕鬆跑 10K 或 6x800 間歇", value=st.session_state.pending_plan)
             
             if st.button("💾 更新訓練紀錄", use_container_width=True):
@@ -237,11 +313,17 @@ def trigger_coach_responses(user_input, data_summary, container):
     tag_info = f" [標籤: {', '.join(st.session_state.pending_tags)}]" if st.session_state.get('pending_tags') else ""
     session_report = f"\n[跑者體感回報]: RPE {st.session_state.pending_rpe}, 感受: {st.session_state.pending_feeling}, 原定計畫: {st.session_state.pending_plan if st.session_state.pending_plan else '未註明'}"
     
-    # 目前單次任務的完整摘要
-    current_session_summary = f"{session_report}\n\n{data_summary if data_summary else ''}"
+    # 決定是否有數據附件 (包含剛上傳的總表或單次數據)
+    has_data = bool(data_summary) or bool(global_hist)
+    g_key, o_key = keys.get("GEMINI_API_KEY", ""), keys.get("OPENAI_API_KEY", "")
+    
+    # === 意圖與回應者判斷 ===
+    intent = determine_intent(g_key, user_input, has_data=has_data)
+    speaker_order = determine_speakers(g_key, user_input, has_data=has_data)
 
     memory_context = ""
-    if keys.get("OPENAI_API_KEY", ""):
+    # 若非單純閒聊，且為歷史或數據探勘，才啟動向量資料庫語意搜索，節省延遲與 API Token
+    if intent in ["HISTORY", "DATA"] and keys.get("OPENAI_API_KEY", ""):
         try:
             sync_memory_store(keys.get("OPENAI_API_KEY", ""))
             memory_context = get_relevant_memories(
@@ -252,15 +334,21 @@ def trigger_coach_responses(user_input, data_summary, container):
         except Exception:
             memory_context = ""
 
-    g_key, o_key = keys.get("GEMINI_API_KEY", ""), keys.get("OPENAI_API_KEY", "")
-    
-    # 決定是否有數據附件 (包含剛上傳的總表或單次數據)
-    has_data = bool(data_summary) or bool(global_hist)
-    speaker_order = determine_speakers(g_key, user_input, has_data=has_data)
-    
-    # 整合記憶內容到當前摘要
-    if memory_context:
-        current_session_summary = f"【相關過往記憶】:\n{memory_context}\n\n{current_session_summary}"
+    # === 動態組裝記憶系統，對症下藥以節省百萬 Token ===
+    if intent == "CHAT":
+        # 閒聊模式：拋棄沉重的歷史總表與 RAG，只保留當前的 RPE 與對話
+        current_session_summary = session_report
+        combined_global_hist = "目前使用者正在閒聊，不需要參考長期數據。"
+    elif intent == "DATA":
+        # 數據模式：焦點放在剛上傳的數據，保留背景知識，但不需掛載龐大的關聯回憶
+        current_session_summary = f"{session_report}\n\n{data_summary if data_summary else ''}"
+        combined_global_hist = f"{global_hist}\n\n[近期訓練回顧 (RAG)]:\n{history_context}"
+    else: # HISTORY
+        # 歷史探勘：火力全開，掛載所有的 Pinecone 關聯記憶與 RAG 總表
+        current_session_summary = f"{session_report}\n\n{data_summary if data_summary else ''}"
+        if memory_context:
+            current_session_summary = f"【相關過往記憶】:\n{memory_context}\n\n{current_session_summary}"
+        combined_global_hist = f"{global_hist}\n\n[近期訓練回顧 (RAG)]:\n{history_context}"
     
     prev_luger = ""
     prev_pace = ""
@@ -275,7 +363,7 @@ def trigger_coach_responses(user_input, data_summary, container):
                 holder.markdown("*💭 路格正在思考...*")
                 try:
                     buf = ""
-                    for chk in stream_luger(g_key, luger_history, user_profile, current_session_summary, global_hist, round_input, prev_pace_response=prev_pace):
+                    for chk in stream_luger(g_key, luger_history, user_profile, current_session_summary, combined_global_hist, round_input, prev_pace_response=prev_pace):
                         buf += chk
                         holder.markdown(buf + "▌")
                     holder.markdown(buf)
@@ -292,7 +380,7 @@ def trigger_coach_responses(user_input, data_summary, container):
                 holder.markdown("*💭 佩絲正在思考...*")
                 try:
                     buf = ""
-                    for chk in stream_pace(o_key, user_profile, full_l, current_session_summary, global_hist, round_input, prev_luger_response=prev_luger, history=pace_history):
+                    for chk in stream_pace(o_key, user_profile, full_l, current_session_summary, combined_global_hist, round_input, prev_luger_response=prev_luger, history=pace_history):
                         buf += chk
                         holder.markdown(buf + "▌")
                     holder.markdown(buf)
@@ -415,7 +503,7 @@ with tab1:
                     if "time" in msg:
                         is_last = (msg_pos == len(turn) - 1)
                         if is_last:
-                            tc, _, dc = st.columns([8, 1, 1])
+                            tc, dc = st.columns([0.92, 0.08])
                             tc.caption(f"🕒 {msg['time']}")
                             
                             # 修正對應到全域消息索引
@@ -455,7 +543,17 @@ with tab1:
         if st.session_state.pending_summary:
             this_turn_summary = st.session_state.pending_summary
             tags_display = f" [{', '.join(st.session_state.pending_tags)}]" if st.session_state.pending_tags else ""
-            final_content = f"📎 [附件: {st.session_state.pending_file_name}]{tags_display}\n\n{user_input}"
+            final_content = f"📎 [附件: {st.session_state.pending_file_name} 已上傳，數據詳見系統內文]{tags_display}\n\n{user_input}"
+            
+            # 對話送出時，自動利用表單的當前狀態更新至儲存的歷史紀錄，免除手動按更新鈕
+            save_run_to_history(
+                this_turn_summary,
+                tags=st.session_state.pending_tags,
+                rpe=st.session_state.pending_rpe,
+                feeling=st.session_state.pending_feeling,
+                plan=st.session_state.pending_plan
+            )
+            
             st.session_state.pending_summary = ""
             st.session_state.pending_tags = []
 
