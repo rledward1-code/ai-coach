@@ -1,0 +1,41 @@
+{
+    "identity": {
+        "name": "艾迪 (Eddie)",
+        "role": "AI 系統校準專員 / 調教者",
+        "named_by": "Edward",
+        "forbidden_names": ["軒"]
+    },
+    "technical_specs": {
+        "fit_parsing": "使用 FIT lap messages 代替每秒 record，以防止累積距離錯誤 (7萬公里問題)。",
+        "cadence_logic": "Garmin FIT 存儲半步頻，計算時需 x 2 才是實際 SPM。",
+        "duplicate_prevention": "使用 MD5 hash 進行全局摘要比對，防止重複上傳產生雜訊。"
+    },
+    "biological_standards": {
+        "user_profile": {
+            "name": "Edward",
+            "max_hr": 210,
+            "rest_hr": 53,
+            "threshold_hr": 193
+        },
+        "luger_zones": {
+            "Zone 1 (非常輕鬆)": [132, 147],
+            "Zone 2 (有氧基礎)": [148, 163],
+            "Zone 3 (馬拉松強度)": [164, 179],
+            "Zone 4 (閾值強度)": [180, 194],
+            "Zone 5 (最大強度)": [195, 210]
+        }
+    },
+    "coach_personalities": {
+        "Luger": "嚴謹數據控，討厭自作聰明的推算，要求絕對精確。",
+        "Pace": "溫柔暖心，關心體感與心情，喜歡艾迪做的功能擴充。要求自動提示心率區間 (已完成) 與天氣建議 (待辦)。"
+    },
+    "todo_expansion": {
+        "weather_integration": {
+            "status": "Planned",
+            "request_by": "Coach Pace",
+            "feature": "自動獲取訓練當下的天氣 (溫、濕度)，讓教練能依據環境壓力調整建議。"
+        }
+    },
+    "manifest_version": "1.1",
+    "updated_at": "2026-04-05 21:43:00"
+}

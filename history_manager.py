@@ -12,35 +12,41 @@ GLOBAL_HISTORY_FILE = os.path.join(DATA_DIR, "global_history_summary.txt")
 USER_PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
 MAX_CHAT_MESSAGES = 100  # 設定保留最近 100 則訊息 (約 30-50 輪對話)
 
+import hashlib
+
+def _summary_hash(text: str) -> str:
+    return hashlib.md5(text.strip().encode("utf-8")).hexdigest()[:12]
+
 def save_run_to_history(summary_text, tags=None, rpe=None, feeling=None, plan=None):
     """將單次訓練摘要存入歷史，最多保留最近 20 筆"""
     history = load_history()
-    
+    new_hash = _summary_hash(summary_text)
+
+    # 全局去重：若已有相同 summary（hash 比對），只更新補充資訊
+    for entry in reversed(history):
+        if entry.get("_hash") == new_hash:
+            if rpe is not None:     entry["rpe"] = rpe
+            if feeling is not None: entry["feeling"] = feeling
+            if plan is not None:    entry["plan"] = plan
+            if tags:                entry["tags"] = tags
+            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump(history, f, ensure_ascii=False, indent=4)
+            return  # 已存在，不新增
+
     entry = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "summary": summary_text,
+        "_hash": new_hash,
         "tags": tags or [],
         "rpe": rpe,
         "feeling": feeling,
         "plan": plan
     }
-    
-    # 避免重複存入同一筆，但更新 RPE、Feeling 等補充資訊
-    if history and history[-1]["summary"] == summary_text:
-        history[-1]["tags"] = tags or []
-        if rpe is not None: history[-1]["rpe"] = rpe
-        if feeling is not None: history[-1]["feeling"] = feeling
-        if plan is not None: history[-1]["plan"] = plan
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(history, f, ensure_ascii=False, indent=4)
-        return
-        
     history.append(entry)
-    
-    # 只保留最近 20 筆，避免 Prompt 爆炸
+
     if len(history) > 20:
         history = history[-20:]
-        
+
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, ensure_ascii=False, indent=4)
 

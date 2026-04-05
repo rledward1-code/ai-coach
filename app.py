@@ -13,6 +13,7 @@ from history_manager import (
     save_global_history, load_global_history, save_user_profile, load_user_profile
 )
 from memory_manager import sync_memory_store, get_relevant_memories
+import garmin_local
 
 # --- 1. Session State 初始化 ---
 if "messages" not in st.session_state:
@@ -41,13 +42,69 @@ def load_keys():
             return json.load(f)
     return {}
 
+def save_keys_file(data: dict):
+    existing = load_keys()
+    existing.update(data)
+    with open("keys.json", "w", encoding="utf-8") as f:
+        json.dump(existing, f, indent=4)
+
 keys = load_keys()
 st.set_page_config(
-    page_title="AI Coach 6.0",
+    page_title="AI Coach 7.0",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={}
 )
+
+# --- 2.1 首次啟動引導：缺少必要金鑰時顯示設定頁 ---
+def _is_setup_complete():
+    k = load_keys()
+    return bool(k.get("GEMINI_API_KEY")) and bool(k.get("OPENAI_API_KEY"))
+
+if not _is_setup_complete():
+    st.title("🏃 AI Coach 7.0 — 初始設定")
+    st.markdown("歡迎！在開始之前，請填入你的 AI 服務金鑰。這些資訊只會儲存在你本機的 `keys.json`，不會上傳至任何地方。")
+
+    with st.expander("🔑 如何取得 API Key？", expanded=False):
+        st.markdown("""
+**Gemini API Key (路格教練使用)**
+1. 前往 [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. 點選「Create API Key」
+3. 複製後貼到下方
+
+**OpenAI API Key (佩絲教練使用)**
+1. 前往 [OpenAI Platform](https://platform.openai.com/api-keys)
+2. 點選「Create new secret key」
+3. 複製後貼到下方（注意：只會顯示一次！）
+
+**Strava (可選，用於自動同步訓練數據)**
+1. 前往 [Strava API Settings](https://www.strava.com/settings/api)
+2. 建立應用程式後取得 Client ID 與 Secret
+        """)
+
+    st.divider()
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("必填")
+        inp_gemini = st.text_input("🧠 Gemini API Key (路格教練)", type="password", placeholder="AIzaSy...")
+        inp_openai = st.text_input("🤖 OpenAI API Key (佩絲教練)", type="password", placeholder="sk-proj-...")
+    with col2:
+        st.subheader("選填 — Strava 自動同步")
+        inp_strava_id = st.text_input("Strava Client ID", placeholder="123456")
+        inp_strava_secret = st.text_input("Strava Client Secret", type="password", placeholder="abc123...")
+
+    if st.button("✅ 儲存並啟動教練", type="primary", use_container_width=True):
+        if not inp_gemini or not inp_openai:
+            st.error("Gemini 和 OpenAI 的 API Key 都是必填的！")
+        else:
+            data = {"GEMINI_API_KEY": inp_gemini.strip(), "OPENAI_API_KEY": inp_openai.strip()}
+            if inp_strava_id: data["STRAVA_CLIENT_ID"] = inp_strava_id.strip()
+            if inp_strava_secret: data["STRAVA_CLIENT_SECRET"] = inp_strava_secret.strip()
+            save_keys_file(data)
+            st.success("設定完成！正在啟動教練系統...")
+            st.rerun()
+
+    st.stop()  # 未設定完成前，阻止以下所有 UI 渲染
 
 # --- 2.5 建立功能彈窗 ---
 @st.dialog("上傳歷史總表 (Garmin/Strava)")
@@ -180,6 +237,48 @@ with st.sidebar:
     else:
         st.info("請於 keys.json 中設定 STRAVA_CLIENT_ID 啟用串接。")
 
+    # --- Garmin 本地同步 (USB + Watch Folder) ---
+    st.markdown("---")
+    with st.expander("⚙️ Garmin 同步資料夾設定", expanded=False):
+        saved_watch_folder = keys.get("GARMIN_WATCH_FOLDER", "")
+        new_watch_folder = st.text_input(
+            "Watch Folder 路徑（備援）",
+            value=saved_watch_folder,
+            placeholder=r"例如 C:\Users\Edward\Downloads\Garmin",
+            help="插 USB 沒抓到時的備援資料夾，可以是 Garmin Express 同步目標或你習慣放 .fit 的地方"
+        )
+        if st.button("💾 儲存路徑", use_container_width=True):
+            save_keys_file({"GARMIN_WATCH_FOLDER": new_watch_folder.strip()})
+            keys["GARMIN_WATCH_FOLDER"] = new_watch_folder.strip()
+            st.toast("✅ 路徑已儲存")
+
+    watch_folder_path = keys.get("GARMIN_WATCH_FOLDER", "")
+    if st.button("🔌 從 Garmin 手錶同步最新活動", use_container_width=True, type="primary"):
+        with st.spinner("掃描中... 請確認手錶已插上 USB"):
+            fit_path, garmin_msg = garmin_local.get_latest_fit(watch_folder=watch_folder_path)
+        if fit_path:
+            st.success(garmin_msg)
+            with st.spinner("解析 .fit 中..."):
+                df, summary, _, tags = process_data(fit_path)
+            if summary and not summary.startswith("解析"):
+                st.session_state.df = df
+                st.session_state.pending_summary = summary
+                st.session_state.pending_tags = tags
+                import os as _os
+                st.session_state.pending_file_name = _os.path.basename(fit_path)
+                save_run_to_history(
+                    summary,
+                    tags=tags,
+                    rpe=st.session_state.pending_rpe,
+                    feeling=st.session_state.pending_feeling,
+                    plan=st.session_state.pending_plan
+                )
+                st.success("✅ 已載入！請輸入訊息讓教練分析。")
+            else:
+                st.error(f"解析失敗：{summary}")
+        else:
+            st.warning(garmin_msg)
+
     st.markdown("<div style='text-align: center; color: #888; font-size: 0.8rem; margin: 10px 0;'>— OR 手動上傳 —</div>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader("FIT / CSV", type=["fit", "csv"], label_visibility="collapsed")
     if uploaded_file and uploaded_file.name != st.session_state.pending_file_name:
@@ -192,13 +291,7 @@ with st.sidebar:
         st.session_state.pending_summary = summary
         st.session_state.pending_tags = tags
         st.session_state.pending_file_name = uploaded_file.name
-        save_run_to_history(
-            summary, 
-            tags=tags, 
-            rpe=st.session_state.pending_rpe, 
-            feeling=st.session_state.pending_feeling, 
-            plan=st.session_state.pending_plan
-        )
+        # 注意：不在這裡存 history，等用戶送出對話時才存（避免測試時重複上傳寫入多筆）
 
     if st.session_state.pending_file_name:
         st.success(f"✅ {st.session_state.pending_file_name}")

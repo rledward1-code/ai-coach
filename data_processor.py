@@ -17,16 +17,85 @@ def process_data(file_path):
     except Exception as e:
         return pd.DataFrame(), f"解析檔案時發生異常: {str(e)}", {}, []
 
+# lap message 欄位 → 內部欄位（每圈摘要，有 avg_stance_time 等跑姿數據）
+LAP_FIELD_MAP = {
+    'avg_stance_time':           'gct',          # ms，觸地時間
+    'avg_vertical_oscillation':  'vertical_osc', # mm → ÷10 = cm
+    'avg_running_cadence':       'cadence',       # steps/min (單腳) → ×2
+    'avg_cadence':               'cadence',
+    'avg_heart_rate':            'heart_rate',
+    'avg_speed':                 '_speed',        # m/s → pace
+    'enhanced_avg_speed':        '_speed',
+    'total_distance':            'distance',      # 單圈距離 (m)
+    'avg_grade':                 'grade',
+    'avg_altitude':              'elevation',
+}
+
 def _process_fit(file_path):
     fitfile = FitFile(file_path)
-    records = []
+    laps = []
     session_data = {}
+
     for msg in fitfile.get_messages():
-        if msg.name == 'record':
-            records.append(msg.get_values())
+        if msg.name == 'lap':
+            laps.append(msg.get_values())
         elif msg.name == 'session':
             session_data = msg.get_values()
-    df = pd.DataFrame(records)
+
+    # 優先用 lap 每圈摘要（有 avg_stance_time 等跑姿數據，距離正確）
+    if laps:
+        df = pd.DataFrame(laps)
+        df.insert(0, 'lap', range(1, len(df) + 1))
+
+        # rename，避免同一目標被多個來源覆蓋
+        rename_map = {}
+        used_dst = set()
+        for src, dst in LAP_FIELD_MAP.items():
+            if src in df.columns and src != dst and dst not in used_dst:
+                rename_map[src] = dst
+                used_dst.add(dst)
+        df = df.rename(columns=rename_map)
+
+        # cadence: Garmin lap avg_running_cadence 是單腳 steps/min → ×2
+        if 'cadence' in df.columns:
+            df['cadence'] = pd.to_numeric(df['cadence'], errors='coerce') * 2
+
+        # speed (m/s) → pace (min/km)
+        if '_speed' in df.columns:
+            spd = pd.to_numeric(df['_speed'], errors='coerce')
+            df['pace'] = (1000 / spd / 60).where(spd > 0)
+            df['pace_str'] = df['pace'].apply(
+                lambda x: f"{int(x)}:{int((x % 1)*60):02d}" if pd.notna(x) else 'N/A'
+            )
+            df = df.drop(columns=['_speed'])
+
+        # vertical_osc: mm → cm
+        if 'vertical_osc' in df.columns:
+            df['vertical_osc'] = pd.to_numeric(df['vertical_osc'], errors='coerce') / 10.0
+
+        # gct: 正常觸地時間 100-400ms；若 median > 10000 則單位可能是 ms*1000
+        if 'gct' in df.columns:
+            gct_vals = pd.to_numeric(df['gct'], errors='coerce')
+            if gct_vals.median() > 10000:
+                gct_vals = gct_vals / 1000
+            df['gct'] = gct_vals
+
+        # distance: 單圈距離 m → km
+        if 'distance' in df.columns:
+            df['distance'] = pd.to_numeric(df['distance'], errors='coerce')
+            df['dist_km'] = df['distance'] / 1000
+
+    else:
+        # 沒有 lap：fallback 用 session 建一筆總結
+        row = {'lap': 1}
+        for src, dst in LAP_FIELD_MAP.items():
+            if src in session_data:
+                row[dst] = session_data[src]
+        df = pd.DataFrame([row])
+        if 'distance' in df.columns:
+            df['distance'] = pd.to_numeric(df['distance'], errors='coerce')
+            df['dist_km'] = df['distance'] / 1000
+
     return _apply_standard_processing(df, session_data)
 
 # Garmin CSV 欄位名稱 → 內部欄位名稱（含中英文版本）
@@ -139,10 +208,43 @@ def _apply_standard_processing(df, session_data):
                 return np.nan
         df['pace'] = df['pace_str'].apply(p_to_f)
 
-    # 數值欄位轉型
     for col in ['cadence', 'grade', 'elevation', 'gct', 'vertical_osc']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # --- 載入用戶個人化心率參數 ---
+    user_max_hr = 190
+    user_rest_hr = 60
+    try:
+        if os.path.exists("data/user_profile.json"):
+            with open("data/user_profile.json", "r", encoding="utf-8") as f:
+                u_profile = json.load(f)
+                user_max_hr = u_profile.get("max_hr", 190)
+                user_rest_hr = u_profile.get("rest_hr", 60)
+    except:
+        pass
+
+    def get_hr_zone(hr):
+        if not pd.notna(hr) or hr <= 0: return ""
+        
+        # --- 針對 Edward (210/53-56) 的路格專屬精確校準 ---
+        if user_max_hr == 210:
+            if hr < 132: return ""
+            elif hr < 148: return "(Zone 1)" # 132-147
+            elif hr < 164: return "(Zone 2)" # 148-163
+            elif hr < 180: return "(Zone 3)" # 164-179
+            elif hr < 195: return "(Zone 4)" # 180-194
+            else: return "(Zone 5)"         # 195-210
+        
+        # --- 其他用戶的通用 HRR 邏輯 ---
+        hrr_total = user_max_hr - user_rest_hr
+        if hrr_total <= 0: return ""
+        pct_hrr = (hr - user_rest_hr) / hrr_total
+        if pct_hrr < 0.5: return "(Zone 1)"
+        elif pct_hrr < 0.7: return "(Zone 2)"
+        elif pct_hrr < 0.8: return "(Zone 3)"
+        elif pct_hrr < 0.9: return "(Zone 4)"
+        else: return "(Zone 5)"
 
     # 生成摘要文字
     lines = ["📊 [數據解析成功：計圈跑姿數據]"]
@@ -171,7 +273,8 @@ def _apply_standard_processing(df, session_data):
         vo  = row.get('vertical_osc', None)
         gr  = row.get('grade', None)
 
-        parts = [f"配速 {p}", f"心率 {hr} bpm"]
+        hr_zone = get_hr_zone(hr) if isinstance(hr, (int, float)) else ""
+        parts = [f"配速 {p}", f"心率 {hr} bpm {hr_zone}".strip()]
         if pd.notna(cad) if cad is not None else False:
             parts.append(f"步頻 {cad:.0f}")
         if pd.notna(gct) if gct is not None else False:
