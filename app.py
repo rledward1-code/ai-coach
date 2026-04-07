@@ -451,38 +451,51 @@ def trigger_coach_responses(user_input, data_summary, container):
     
     for speaker in speaker_order:
         if speaker == "luger":
-            with cp.chat_message(name="路格教練", avatar="assets/luger.png"):
-                holder = st.empty()
-                holder.markdown("*💭 路格正在思考...*")
-                try:
-                    buf = ""
-                    for chk in stream_luger(g_key, luger_history, user_profile, current_session_summary, combined_global_hist, round_input, prev_pace_response=prev_pace):
-                        buf += chk
-                        holder.markdown(buf + "▌")
-                    holder.markdown(buf)
-                    full_l = buf
-                except Exception as e:
-                    holder.markdown(f"路格異常: {e}")
+            full_l = ""
+            try:
+                stream_gen = stream_luger(g_key, luger_history, user_profile, current_session_summary, combined_global_hist, round_input, prev_pace_response=prev_pace)
+                # 使用者體驗優化：逐字顯示，但防空殼
+                container_l = None
+                for chk in stream_gen:
+                    if not full_l and chk.strip(): # 真正收到內容，火速開框
+                        container_l = cp.chat_message(name="路格教練", avatar="assets/luger.png")
+                        holder = container_l.empty()
+                    
+                    full_l += chk
+                    if 'holder' in locals() and full_l.strip():
+                        holder.markdown(full_l + "▌")
+                
+                if 'holder' in locals() and full_l.strip():
+                    holder.markdown(full_l)
+            except Exception as e:
+                st.error(f"路格診斷異常: {e}")
             
-            st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "assets/luger.png", "content": full_l, "time": now_str})
-            prev_luger = full_l
+            if full_l.strip(): 
+                st.session_state.messages.append({"role": "assistant", "name": "路格教練", "avatar": "assets/luger.png", "content": full_l, "time": now_str})
+                prev_luger = full_l
         
         else:  # pace
-            with cp.chat_message(name="佩絲教練", avatar="assets/pace.png"):
-                holder = st.empty()
-                holder.markdown("*💭 佩絲正在思考...*")
-                try:
-                    buf = ""
-                    for chk in stream_pace(o_key, user_profile, full_l, current_session_summary, combined_global_hist, round_input, prev_luger_response=prev_luger, history=pace_history):
-                        buf += chk
-                        holder.markdown(buf + "▌")
-                    holder.markdown(buf)
-                    full_p = buf
-                except Exception as e:
-                    holder.markdown(f"佩絲異常: {e}")
+            full_p = ""
+            try:
+                stream_gen_p = stream_pace(o_key, user_profile, full_l, current_session_summary, combined_global_hist, round_input, prev_luger_response=prev_luger, history=pace_history)
+                container_p = None
+                for chk in stream_gen_p:
+                    if not full_p and chk.strip(): 
+                        container_p = cp.chat_message(name="佩絲教練", avatar="assets/pace.png")
+                        holder_p = container_p.empty()
+                    
+                    full_p += chk
+                    if 'holder_p' in locals() and full_p.strip():
+                        holder_p.markdown(full_p + "▌")
+                
+                if 'holder_p' in locals() and full_p.strip():
+                    holder_p.markdown(full_p)
+            except Exception as e:
+                st.error(f"佩絲補充失敗: {e}")
             
-            st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "assets/pace.png", "content": full_p, "time": now_str})
-            prev_pace = full_p
+            if full_p.strip():
+                st.session_state.messages.append({"role": "assistant", "name": "佩絲教練", "avatar": "assets/pace.png", "content": full_p, "time": now_str})
+                prev_pace = full_p
 
     
     # 偵測教練間是否開始自聊：若最後回應提到對方名字，觸發最多 2 輪的教練自主對話
