@@ -7,7 +7,7 @@ import random
 from datetime import datetime
 import plotly.graph_objects as go
 from data_processor import process_data, process_history_summary
-from coach_engine import stream_luger, stream_pace, determine_rounds, determine_speakers, determine_intent
+from coach_engine import stream_luger, stream_pace, determine_rounds, determine_speakers, determine_intent, determine_logic_combined
 from history_manager import (
     save_run_to_history, get_history_snapshot, save_chat_log, load_chat_log, 
     save_global_history, load_global_history, save_user_profile, load_user_profile
@@ -193,6 +193,21 @@ with st.sidebar:
         u_rest_hr = h2.number_input("靜息心率", value=p_data.get("rest_hr", 56))
         u_threshold_hr = h3.number_input("閾值心率", value=p_data.get("threshold_hr", 193))
     
+    with st.expander("🧠 AI 腦袋設定 (Ollama)", expanded=False):
+        ai_engine_options = ["Cloud (Gemini/GPT)", "Local (Ollama/Gemma)"]
+        current_ai_engine = keys.get("AI_ENGINE", "Cloud")
+        engine_idx = 0 if "Cloud" in current_ai_engine else 1
+        
+        new_engine_label = st.selectbox("核心大腦選擇", ai_engine_options, index=engine_idx)
+        new_engine = "Cloud" if "Cloud" in new_engine_label else "Local"
+        
+        ollama_m = st.text_input("Ollama 模型名稱", value=keys.get("OLLAMA_MODEL", "gemma"))
+        
+        if st.button("💾 儲存 AI 設定", use_container_width=True):
+            save_keys_file({"AI_ENGINE": new_engine, "OLLAMA_MODEL": ollama_m})
+            st.toast(f"✅ 已切換至 {new_engine_label}")
+            st.rerun()
+
     # 組裝與即時儲存
     user_profile = f"跑者 ({u_name}): {u_age}歲{u_gender}, 最大心率: {u_max_hr}, 靜息: {u_rest_hr}, 閾值: {u_threshold_hr}"
     save_user_profile({
@@ -364,11 +379,12 @@ div[data-testid="stChatMessage"] {
 
 # --- 6. 核心處理邏輯 (多輪對話版) ---
 def trigger_coach_responses(user_input, data_summary, container):
+    import time
+    t0 = time.time()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     time_prefix = f"[系統時間: {now_str}]\n"
     
-    # 為路格建立歷史：路格的回覆 = model，佩絲的回覆 = user context（關鍵！）
-    # 這樣 Gemini 才知道佩絲是「別人」，不會把兩個角色都演出來
+    # 為路格建立歷史
     luger_history = []
     pace_history = []
     for msg in st.session_state.messages:
@@ -401,8 +417,11 @@ def trigger_coach_responses(user_input, data_summary, container):
     if luger_history: luger_history = luger_history[:-1]
     if pace_history: pace_history = pace_history[:-1]
 
+    t_prep = time.time()
     history_context = get_history_snapshot()
     global_hist = load_global_history()
+    t_load_hist = time.time()
+    
     tag_info = f" [標籤: {', '.join(st.session_state.pending_tags)}]" if st.session_state.get('pending_tags') else ""
     session_report = f"\n[跑者體感回報]: RPE {st.session_state.pending_rpe}, 感受: {st.session_state.pending_feeling}, 原定計畫: {st.session_state.pending_plan if st.session_state.pending_plan else '未註明'}"
     
@@ -410,13 +429,18 @@ def trigger_coach_responses(user_input, data_summary, container):
     has_data = bool(data_summary) or bool(global_hist)
     g_key, o_key = keys.get("GEMINI_API_KEY", ""), keys.get("OPENAI_API_KEY", "")
     
-    # === 意圖與回應者判斷 ===
-    intent = determine_intent(g_key, user_input, has_data=has_data)
-    speaker_order = determine_speakers(g_key, user_input, has_data=has_data)
+    # === 意圖與回應者組合判斷 (優化後) ===
+    ai_eng = keys.get("AI_ENGINE", "Cloud")
+    ollama_m = keys.get("OLLAMA_MODEL", "gemma")
+    
+    intent, speaker_order = determine_logic_combined(
+        g_key, user_input, has_data=has_data, ai_engine=ai_eng, ollama_model=ollama_m
+    )
+    t_logic = time.time()
 
     memory_context = ""
-    # 若非單純閒聊，且為歷史或數據探勘，才啟動向量資料庫語意搜索，節省延遲與 API Token
-    if intent in ["HISTORY", "DATA"] and keys.get("OPENAI_API_KEY", ""):
+    # 若在 Local 模式，跳過連線 OpenAI 進行向量同步，節省 4090 的等待時間
+    if ai_eng == "Cloud" and intent in ["HISTORY", "DATA"] and keys.get("OPENAI_API_KEY", ""):
         try:
             sync_memory_store(keys.get("OPENAI_API_KEY", ""))
             memory_context = get_relevant_memories(
@@ -426,6 +450,15 @@ def trigger_coach_responses(user_input, data_summary, container):
             )
         except Exception:
             memory_context = ""
+    t_rag = time.time()
+
+    # 在 UI 輸出計時資訊 (僅開發者可見的 Debug)
+    print(f"\n--- [4090 性能監控] ---")
+    print(f"1. 歷史載入: {t_load_hist - t_prep:.2f}s")
+    print(f"2. AI 邏輯判斷: {t_logic - t_load_hist:.2f}s")
+    print(f"3. 向量庫同步(RAG): {t_rag - t_logic:.2f}s")
+    print(f"4. 總前置耗時: {t_rag - t0:.2f}s")
+    print(f"----------------------\n")
 
     # === 動態組裝記憶系統，對症下藥以節省百萬 Token ===
     if intent == "CHAT":
@@ -456,7 +489,17 @@ def trigger_coach_responses(user_input, data_summary, container):
                 holder.markdown("*💭 路格正在思考...*")
                 try:
                     buf = ""
-                    for chk in stream_luger(g_key, luger_history, user_profile, current_session_summary, combined_global_hist, round_input, prev_pace_response=prev_pace):
+                    for chk in stream_luger(
+                        g_key, 
+                        luger_history, 
+                        user_profile, 
+                        current_session_summary, 
+                        combined_global_hist, 
+                        round_input, 
+                        prev_pace_response=prev_pace,
+                        ai_engine=keys.get("AI_ENGINE", "Cloud"),
+                        ollama_model=keys.get("OLLAMA_MODEL", "gemma")
+                    ):
                         buf += chk
                         holder.markdown(buf + "▌")
                     holder.markdown(buf)
@@ -473,7 +516,18 @@ def trigger_coach_responses(user_input, data_summary, container):
                 holder.markdown("*💭 佩絲正在思考...*")
                 try:
                     buf = ""
-                    for chk in stream_pace(o_key, user_profile, full_l, current_session_summary, combined_global_hist, round_input, prev_luger_response=prev_luger, history=pace_history):
+                    for chk in stream_pace(
+                        o_key, 
+                        user_profile, 
+                        full_l, 
+                        current_session_summary, 
+                        combined_global_hist, 
+                        round_input, 
+                        prev_luger_response=prev_luger, 
+                        history=pace_history,
+                        ai_engine=keys.get("AI_ENGINE", "Cloud"),
+                        ollama_model=keys.get("OLLAMA_MODEL", "gemma")
+                    ):
                         buf += chk
                         holder.markdown(buf + "▌")
                     holder.markdown(buf)
@@ -506,7 +560,16 @@ def trigger_coach_responses(user_input, data_summary, container):
                     # 用空的 user_input，讓教練自行接話
                     coach_prompt = f"（繼續剛才的討論，對佩絲說話，不需要理會 Edward）"
                     buf = ""
-                    for chk in stream_luger(g_key, luger_history, user_profile, full_cv, coach_prompt, prev_pace_response=prev_pace):
+                    for chk in stream_luger(
+                        g_key, 
+                        luger_history, 
+                        user_profile, 
+                        current_session_summary, 
+                        coach_prompt, 
+                        prev_pace_response=prev_pace,
+                        ai_engine=ai_eng,
+                        ollama_model=ollama_m
+                    ):
                         buf += chk
                         holder.markdown(buf + "▌")
                     holder.markdown(buf)
@@ -523,7 +586,17 @@ def trigger_coach_responses(user_input, data_summary, container):
                 try:
                     coach_prompt_p = f"（繼續跟路格討論，不需要特別理會 Edward）"
                     buf = ""
-                    for chk in stream_pace(o_key, user_profile, full_l_cc, full_cv, coach_prompt_p, prev_luger_response=prev_luger, history=pace_history):
+                    for chk in stream_pace(
+                        o_key, 
+                        user_profile, 
+                        full_l_cc, 
+                        current_session_summary, 
+                        coach_prompt_p, 
+                        prev_luger_response=prev_luger, 
+                        history=pace_history,
+                        ai_engine=ai_eng,
+                        ollama_model=ollama_m
+                    ):
                         buf += chk
                         holder.markdown(buf + "▌")
                     holder.markdown(buf)

@@ -36,6 +36,16 @@
             "feature": "自動獲取訓練當下的天氣 (溫、濕度)，讓教練能依據環境壓力調整建議。"
         }
     },
-    "manifest_version": "1.1",
-    "updated_at": "2026-04-05 21:43:00"
+    "development_milestones": {
+        "2026-04-07_ollama_integration": "實作 Ollama 本地化整合，支援 Gemma 模型作為大腦。",
+        "2026-04-07_engine_switcher": "新增側邊欄 AI 引擎切換功能，可隨時在雲端 (Gemini/GPT) 與本地間切換。",
+        "2026-04-08_performance_tuning": {
+            "batched_logic": "將意圖判斷與回應者決策合併為單一 JSON 請求，省去 50% 前置時間。",
+            "context_slimming": "將傳輸數據從 30,000 字精簡至 6,000 字，優化 4090 本地推論速度。",
+            "direct_api_access": "捨棄 SDK 改用 requests 直連 Ollama API，並導入 keep_alive 參數防止顯存頻繁裝載。",
+            "performance_monitor": "內建性能探針，即時追蹤路徑中各階段的耗時 (ms)。"
+        }
+    },
+    "manifest_version": "1.2",
+    "updated_at": "2026-04-09 00:25:00"
 }

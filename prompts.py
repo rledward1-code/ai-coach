@@ -92,3 +92,28 @@ luger / pace / both_luger_first / both_pace_first
 訊息內容：{user_input}
 有數據附件：{has_data}
 """
+
+# 合併判斷：一次決定意圖與發言者 (用於優化 4090 本機速度)
+COMBINED_JUDGE_PROMPT = """
+你是一個跑步教練系統的邏輯路由器。請分析使用者輸入，並一次回傳兩個關鍵決策。
+
+1. **intent (意圖)**:
+   - CHAT: 純閒聊、心情分享、打招呼。
+   - DATA: 針對當次訓練數據、配速、心率進行檢討。
+   - HISTORY: 詢問過去進步情況、長期趨勢。
+
+2. **speaker (發言者)**:
+   - luger: 只有路格需要說話。
+   - pace: 只有佩絲需要說話。
+   - both_luger_first: 需要兩人會診（技術優先），路格先說。
+   - both_pace_first: 需要兩人會診（體感優先），佩絲先說。
+
+請嚴格以 JSON 格式輸出，不要包含任何解釋文字：
+{{
+  "intent": "CHAT/DATA/HISTORY",
+  "speaker": "luger/pace/both_luger_first/both_pace_first"
+}}
+
+使用者輸入："{user_input}"
+是否有數據附件：{has_data}
+"""

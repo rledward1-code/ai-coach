@@ -2,6 +2,8 @@ import google.generativeai as genai
 from openai import OpenAI
 import prompts
 import random
+import requests
+import json
 
 def _get_gemini_model(api_key):
     genai.configure(api_key=api_key.strip())
@@ -12,25 +14,64 @@ def _get_gemini_model(api_key):
         target = gemini_models[0] if gemini_models else "models/gemini-pro"
     return genai.GenerativeModel(target)
 
-def determine_rounds(api_key, user_input):
-    """使用 Gemini 判斷本輪對話應該幾輪討論 (1-3)，失敗一律返回 1"""
+def _call_ollama_utility(model_name, prompt):
+    """使用 requests 直連 Ollama API (減少中間層延遲)"""
+    url = "http://localhost:11434/api/chat"
+    payload = {
+        "model": model_name,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+        "options": {
+            "temperature": 0,
+            "num_predict": 50,
+            "top_k": 1,
+            "top_p": 0.1
+        },
+        "keep_alive": "10m"
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=15)
+        if resp.status_code == 200:
+            return resp.json().get("message", {}).get("content", "").strip()
+        return ""
+    except Exception as e:
+        print(f"Ollama Utility Error: {e}")
+        return ""
+
+def determine_rounds(api_key, user_input, ai_engine="Cloud", ollama_model="gemma"):
+    """使用 AI 判斷本輪對話應該幾輪討論 (1-3)"""
+    prompt = prompts.ROUND_JUDGE_PROMPT.format(user_input=user_input)
+    
+    if ai_engine == "Local":
+        result = _call_ollama_utility(ollama_model, prompt)
+        try:
+            rounds = int(result[0])
+            return max(1, min(3, rounds))
+        except: return 1
+
     try:
         model = _get_gemini_model(api_key)
-        prompt = prompts.ROUND_JUDGE_PROMPT.format(user_input=user_input)
         resp = model.generate_content(prompt)
         rounds = int(resp.text.strip()[0])
         return max(1, min(3, rounds))
     except:
-        return 1  # 失敗時保守返回 1 輪，避免重複
+        return 1
 
-def determine_intent(api_key, user_input, has_data=False):
+def determine_intent(api_key, user_input, has_data=False, ai_engine="Cloud", ollama_model="gemma"):
     """判斷使用者的意圖：CHAT / DATA / HISTORY"""
+    prompt = prompts.INTENT_JUDGE_PROMPT.format(
+        user_input=user_input, 
+        has_data="是" if has_data else "否"
+    )
+
+    if ai_engine == "Local":
+        result = _call_ollama_utility(ollama_model, prompt).upper()
+        if "CHAT" in result: return "CHAT"
+        if "HISTORY" in result: return "HISTORY"
+        return "DATA"
+
     try:
         model = _get_gemini_model(api_key)
-        prompt = prompts.INTENT_JUDGE_PROMPT.format(
-            user_input=user_input, 
-            has_data="是" if has_data else "否"
-        )
         resp = model.generate_content(prompt)
         text = resp.text.strip().upper()
         if "CHAT" in text: return "CHAT"
@@ -39,17 +80,22 @@ def determine_intent(api_key, user_input, has_data=False):
     except:
         return "DATA" if has_data else "CHAT"
 
-def determine_speakers(api_key, user_input, has_data=False):
-    """
-    判斷誰應該回應這條訊息。
-    返回 speaker order list，例如 ["luger", "pace"] 或 ["pace"] 或 ["luger"]
-    """
+def determine_speakers(api_key, user_input, has_data=False, ai_engine="Cloud", ollama_model="gemma"):
+    """判斷誰應該回應這條訊息。"""
+    prompt = prompts.SPEAKER_JUDGE_PROMPT.format(
+        user_input=user_input,
+        has_data="是" if has_data else "否"
+    )
+
+    if ai_engine == "Local":
+        result = _call_ollama_utility(ollama_model, prompt).lower()
+        if "luger" in result and "both" not in result: return ["luger"]
+        if "pace" in result and "both" not in result: return ["pace"]
+        if "both_luger_first" in result: return ["luger", "pace"]
+        return ["pace", "luger"]
+
     try:
         model = _get_gemini_model(api_key)
-        prompt = prompts.SPEAKER_JUDGE_PROMPT.format(
-            user_input=user_input,
-            has_data="是" if has_data else "否"
-        )
         resp = model.generate_content(prompt)
         result = resp.text.strip().lower().split()[0]
         
@@ -67,8 +113,93 @@ def determine_speakers(api_key, user_input, has_data=False):
             return ["luger", "pace"]
         return ["pace", "luger"]
 
-def stream_luger(api_key, history, user_profile, current_summary, global_history, user_input, prev_pace_response=""):
+def determine_logic_combined(api_key, user_input, has_data=False, ai_engine="Cloud", ollama_model="gemma"):
+    """
+    合併判斷：一次決定意圖與發言者。這對於 4090 本機模式非常重要，可以減少一倍的預熱時間。
+    """
+    import json
+    prompt = prompts.COMBINED_JUDGE_PROMPT.format(
+        user_input=user_input,
+        has_data="是" if has_data else "否"
+    )
+
+    if ai_engine == "Local":
+        result_text = _call_ollama_utility(ollama_model, prompt)
+        try:
+            # 嘗試解析 JSON
+            # 有時候模型會吐出 ```json ... ```，先清理一下
+            if "```" in result_text:
+                result_text = result_text.split("```")[1]
+                if result_text.startswith("json"): result_text = result_text[4:]
+            
+            data = json.loads(result_text.strip())
+            intent = data.get("intent", "CHAT").upper()
+            speaker_raw = data.get("speaker", "both_pace_first")
+            
+            if speaker_raw == "luger": speaker_order = ["luger"]
+            elif speaker_raw == "pace": speaker_order = ["pace"]
+            elif speaker_raw == "both_luger_first": speaker_order = ["luger", "pace"]
+            else: speaker_order = ["pace", "luger"]
+            
+            return intent, speaker_order
+        except:
+            # 萬一 JSON 解析失敗，回傳保守預設值
+            return "DATA" if has_data else "CHAT", ["pace", "luger"]
+
+    # 雲端模式下，目前仍維持分開呼叫或在此也實作合併（為了同步優化）
+    # 這裡為了簡單先用原本的邏輯合併
+    intent = determine_intent(api_key, user_input, has_data)
+    speaker_order = determine_speakers(api_key, user_input, has_data)
+    return intent, speaker_order
+
+def _stream_ollama(model_name, system_prompt, user_input, history=None):
+    """使用 requests 直連 Ollama 串流 API"""
+    url = "http://localhost:11434/api/chat"
+    
+    messages = [{"role": "system", "content": system_prompt}]
+    if history:
+        for msg in history:
+            role = "assistant" if msg["role"] in ["model", "assistant"] else "user"
+            messages.append({"role": role, "content": msg["content"]})
+    
+    messages.append({"role": "user", "content": user_input})
+    
+    payload = {
+        "model": model_name,
+        "messages": messages,
+        "stream": True,
+        "keep_alive": "10m"
+    }
+    
+    try:
+        resp = requests.post(url, json=payload, stream=True, timeout=60)
+        for line in resp.iter_lines():
+            if line:
+                chunk = json.loads(line)
+                content = chunk.get("message", {}).get("content", "")
+                if content:
+                    yield content
+                if chunk.get("done"):
+                    break
+    except Exception as e:
+        yield f"Ollama 串流失敗: {str(e)}"
+
+def stream_luger(api_key, history, user_profile, current_summary, global_history, user_input, prev_pace_response="", ai_engine="Cloud", ollama_model="gemma"):
     """路格回應。"""
+    # 這裡進行大幅度精簡：從 30,000 降到 6,000，這對 Ollama 速度提升很大
+    clean_summary = str(current_summary)[:6000] if current_summary else "目前無本次任務數據"
+    gh_summary = str(global_history)[:6000] if global_history else "目前無長期歷史數據"
+
+    system_prompt = prompts.LUGER_SYSTEM_PROMPT.format(
+        user_profile=user_profile,
+        global_history=gh_summary,
+        clean_summary=clean_summary
+    )
+
+    if ai_engine == "Local":
+        yield from _stream_ollama(ollama_model, system_prompt, user_input, history=history)
+        return
+
     try:
         genai.configure(api_key=api_key.strip())
         available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -84,15 +215,6 @@ def stream_luger(api_key, history, user_profile, current_summary, global_history
             {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
-
-        clean_summary = str(current_summary)[:30000] if current_summary else "目前無本次任務數據"
-        gh_summary = str(global_history)[:30000] if global_history else "目前無長期歷史數據"
-
-        system_prompt = prompts.LUGER_SYSTEM_PROMPT.format(
-            user_profile=user_profile,
-            global_history=gh_summary,
-            clean_summary=clean_summary
-        )
 
         # 使用 system_instruction 避免 Gemini 的 user/model 交替限制
         model = genai.GenerativeModel(
@@ -141,19 +263,29 @@ def stream_luger(api_key, history, user_profile, current_summary, global_history
     except Exception as e:
         yield f"路格診斷發生錯誤: {str(e)}"
 
-def stream_pace(api_key, user_profile, luger_analysis, current_summary, global_history, user_input="", prev_luger_response="", history=None):
+def stream_pace(api_key, user_profile, luger_analysis, current_summary, global_history, user_input="", prev_luger_response="", history=None, ai_engine="Cloud", ollama_model="gemma"):
     """佩絲回應。"""
+    # 同步精簡佩絲的數據負擔
+    clean_summary = str(current_summary)[:6000] if current_summary else "目前無本次任務數據"
+    gh_summary = str(global_history)[:6000] if global_history else "目前無長期歷史數據"
+
+    system_content = prompts.PACE_SYSTEM_PROMPT.format(
+        user_profile=user_profile,
+        global_history=gh_summary,
+        clean_summary=clean_summary
+    )
+
+    if ai_engine == "Local":
+        # 組合當前上下文給佩絲
+        full_input = user_input
+        if luger_analysis:
+            full_input = f"（路格剛才說：）{luger_analysis}\n\n{full_input}"
+        
+        yield from _stream_ollama(ollama_model, system_content, full_input, history=history)
+        return
+
     try:
         client = OpenAI(api_key=api_key.strip())
-        clean_summary = str(current_summary)[:30000] if current_summary else "目前無本次任務數據"
-        gh_summary = str(global_history)[:30000] if global_history else "目前無長期歷史數據"
-
-        system_content = prompts.PACE_SYSTEM_PROMPT.format(
-            user_profile=user_profile,
-            global_history=gh_summary,
-            clean_summary=clean_summary
-        )
-
         chat_messages = [{"role": "system", "content": system_content}]
 
         # 注入過去對話記錄
