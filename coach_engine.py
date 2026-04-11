@@ -124,14 +124,24 @@ def determine_logic_combined(api_key, user_input, has_data=False, ai_engine="Clo
     )
 
     if ai_engine == "Local":
+        # 如果是本地模式，我們在 Prompt 裡強化提示數據的存在
+        enhanced_input = f"【系統通知：目前有上傳運動數據={has_data}】\n使用者輸入：{user_input}"
+        prompt = prompts.COMBINED_JUDGE_PROMPT.format(
+            user_input=enhanced_input,
+            has_data="是" if has_data else "否"
+        )
+        
         result_text = _call_ollama_utility(ollama_model, prompt)
         try:
             # 嘗試解析 JSON
-            # 有時候模型會吐出 ```json ... ```，先清理一下
             if "```" in result_text:
                 result_text = result_text.split("```")[1]
                 if result_text.startswith("json"): result_text = result_text[4:]
             
+            # 有時候模型會回傳一堆廢話，我們只取第一個 { 和最後一個 } 之間的內容
+            if "{" in result_text and "}" in result_text:
+                result_text = result_text[result_text.find("{"):result_text.rfind("}")+1]
+
             data = json.loads(result_text.strip())
             intent = data.get("intent", "CHAT").upper()
             speaker_raw = data.get("speaker", "both_pace_first")
@@ -143,8 +153,11 @@ def determine_logic_combined(api_key, user_input, has_data=False, ai_engine="Clo
             
             return intent, speaker_order
         except:
-            # 萬一 JSON 解析失敗，回傳保守預設值
-            return "DATA" if has_data else "CHAT", ["pace", "luger"]
+            # 萬一 JSON 解析失敗，嘗試簡單關鍵字判斷
+            text = result_text.upper()
+            intent = "DATA" if ("DATA" in text or has_data) else "CHAT"
+            if "HISTORY" in text: intent = "HISTORY"
+            return intent, ["pace", "luger"]
 
     # 雲端模式下，目前仍維持分開呼叫或在此也實作合併（為了同步優化）
     # 這裡為了簡單先用原本的邏輯合併
@@ -156,9 +169,12 @@ def _stream_ollama(model_name, system_prompt, user_input, history=None):
     """使用 requests 直連 Ollama 串流 API"""
     url = "http://localhost:11434/api/chat"
     
+    # 本地模型上下文有限，我們只帶入最近 10 則歷史，避免 attention 偏移
+    local_history = history[-10:] if history else []
+    
     messages = [{"role": "system", "content": system_prompt}]
-    if history:
-        for msg in history:
+    if local_history:
+        for msg in local_history:
             role = "assistant" if msg["role"] in ["model", "assistant"] else "user"
             messages.append({"role": role, "content": msg["content"]})
     
@@ -197,7 +213,17 @@ def stream_luger(api_key, history, user_profile, current_summary, global_history
     )
 
     if ai_engine == "Local":
-        yield from _stream_ollama(ollama_model, system_prompt, user_input, history=history)
+        # 本地模式下，為了讓模型「看得到」數據，我們不只放在 System Prompt，
+        # 更要放在當前 User Message 的開頭，防止 Attention 偏移
+        local_input = f"【本次數據摘要】：\n{clean_summary}\n\n【跑者提問】：\n{user_input}"
+        
+        # 同時精簡 System Prompt，避免冗餘導致的上下文擁擠
+        minimal_system = prompts.LUGER_SYSTEM_PROMPT.format(
+            user_profile=user_profile,
+            global_history="（已略過，專注於本次數據）",
+            clean_summary="（見下方 User 訊息）"
+        )
+        yield from _stream_ollama(ollama_model, minimal_system, local_input, history=history)
         return
 
     try:
@@ -276,12 +302,15 @@ def stream_pace(api_key, user_profile, luger_analysis, current_summary, global_h
     )
 
     if ai_engine == "Local":
-        # 組合當前上下文給佩絲
-        full_input = user_input
-        if luger_analysis:
-            full_input = f"（路格剛才說：）{luger_analysis}\n\n{full_input}"
+        # 佩絲同樣在本地模式下強化數據提示
+        local_input = f"【數據摘要】：\n{clean_summary}\n\n【路格分析】：\n{luger_analysis}\n\n【跑者提問】：\n{user_input}"
         
-        yield from _stream_ollama(ollama_model, system_content, full_input, history=history)
+        minimal_system = prompts.PACE_SYSTEM_PROMPT.format(
+            user_profile=user_profile,
+            global_history="（見長期檔案）",
+            clean_summary="（見下方 User 訊息）"
+        )
+        yield from _stream_ollama(ollama_model, minimal_system, local_input, history=history)
         return
 
     try:

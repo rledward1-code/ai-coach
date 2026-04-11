@@ -734,7 +734,7 @@ with tab1:
             with st.chat_message(name=u_name, avatar=f"assets/{u_name}.png" if os.path.exists(f"assets/{u_name}.png") else None):
                 st.markdown(final_content)
 
-        trigger_coach_responses(user_input, this_turn_summary, chat_box)
+        trigger_coach_responses(final_content, this_turn_summary, chat_box)
         st.rerun()
 
 with tab2:
