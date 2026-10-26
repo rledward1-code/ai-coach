@@ -193,6 +193,15 @@ button[data-baseweb="tab"] {
     padding-top: 10px !important;
     padding-bottom: 10px !important;
 }
+
+/* 自訂 Dialog 彈窗寬度與質感美化 (超寬舒適視野) */
+[data-testid="stDialog"] div[role="dialog"] {
+    width: 860px !important;
+    max-width: 92vw !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(56, 189, 248, 0.35) !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -308,7 +317,7 @@ if "user_profile" not in st.session_state:
 profile = st.session_state.user_profile
 user_name = profile.get("name", "跑者")
 
-@st.dialog("⚙️ 跑者個人設定與生理基線 (Profile & Baseline)")
+@st.dialog("⚙️ 跑者個人設定與生理基線 (Profile & Baseline)", width="large")
 def open_profile_dialog():
     curr = st.session_state.get("user_profile", load_user_profile())
     st.caption("自訂跑者基本資訊、心率區間與歷史最佳成績，一鍵將整套 AI Coach 系統切換為您個人或新使用者的專屬教練！")
