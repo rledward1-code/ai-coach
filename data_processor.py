@@ -27,8 +27,16 @@ LAP_FIELD_MAP = {
     'avg_speed':                 '_speed',        # m/s → pace
     'enhanced_avg_speed':        '_speed',
     'total_distance':            'distance',      # 單圈距離 (m)
+    'total_timer_time':          'lap_time',      # 單圈時間 (秒)
+    'total_elapsed_time':        'elapsed_time',  # 單圈總經過時間 (秒)
     'avg_grade':                 'grade',
     'avg_altitude':              'elevation',
+    'avg_step_length':           'step_length',   # mm -> /10 = cm 步幅
+    'avg_vertical_ratio':        'vertical_ratio',# % 垂直步幅比 (移動效率)
+    'avg_stance_time_balance':   'gct_balance',   # % 左右觸地平衡
+    'avg_power':                 'power',         # W 跑步功率
+    'total_ascent':              'ascent',        # m 爬升
+    'total_descent':             'descent',       # m 下降
 }
 
 def _process_fit(file_path):
@@ -64,14 +72,55 @@ def _process_fit(file_path):
         if '_speed' in df.columns:
             spd = pd.to_numeric(df['_speed'], errors='coerce')
             df['pace'] = (1000 / spd / 60).where(spd > 0)
-            df['pace_str'] = df['pace'].apply(
-                lambda x: f"{int(x)}:{int((x % 1)*60):02d}" if pd.notna(x) else 'N/A'
-            )
             df = df.drop(columns=['_speed'])
+
+        # 若 speed 為空或無效，改由 lap_time/elapsed_time 與 distance 倒推每圈配速
+        if 'pace' not in df.columns or df['pace'].isna().all():
+            time_sec = None
+            if 'lap_time' in df.columns:
+                time_sec = pd.to_numeric(df['lap_time'], errors='coerce')
+            elif 'elapsed_time' in df.columns:
+                time_sec = pd.to_numeric(df['elapsed_time'], errors='coerce')
+            
+            if time_sec is not None and 'distance' in df.columns:
+                dist_m = pd.to_numeric(df['distance'], errors='coerce')
+                valid_mask = (dist_m > 30) & (time_sec > 5)
+                calc_pace = (time_sec / 60.0) / (dist_m / 1000.0)
+                if 'pace' not in df.columns:
+                    df['pace'] = calc_pace.where(valid_mask)
+                else:
+                    df['pace'] = df['pace'].fillna(calc_pace.where(valid_mask))
+
+        if 'pace' in df.columns:
+            def _fmt_p(x):
+                if pd.notna(x) and not np.isinf(x) and 2.0 <= x <= 25.0:
+                    return f"{int(x)}:{int((x % 1)*60):02d}"
+                return 'N/A'
+            df['pace_str'] = df['pace'].apply(_fmt_p)
 
         # vertical_osc: mm → cm
         if 'vertical_osc' in df.columns:
             df['vertical_osc'] = pd.to_numeric(df['vertical_osc'], errors='coerce') / 10.0
+
+        # step_length: mm → cm (例如 85.0 cm)
+        if 'step_length' in df.columns:
+            df['step_length'] = pd.to_numeric(df['step_length'], errors='coerce') / 10.0
+
+        # vertical_ratio: % (移動效率比，例如 7.8%)
+        if 'vertical_ratio' in df.columns:
+            df['vertical_ratio'] = pd.to_numeric(df['vertical_ratio'], errors='coerce')
+
+        # gct_balance: % (左右腳平衡，例如 49.3%)
+        if 'gct_balance' in df.columns:
+            df['gct_balance'] = pd.to_numeric(df['gct_balance'], errors='coerce')
+
+        # power: W (跑步功率)
+        if 'power' in df.columns:
+            df['power'] = pd.to_numeric(df['power'], errors='coerce')
+
+        # ascent: m (爬升)
+        if 'ascent' in df.columns:
+            df['ascent'] = pd.to_numeric(df['ascent'], errors='coerce')
 
         # gct: 正常觸地時間 100-400ms；若 median > 10000 則單位可能是 ms*1000
         if 'gct' in df.columns:
@@ -109,7 +158,12 @@ COLUMN_ALIASES = {
     'grade':        ['avg grade', 'grade', '坡度', '平均坡度', 'incline'],
     'elevation':    ['min elevation', 'max elevation', 'elevation', '海拔', '高度'],
     'gct':          ['avg ground contact time', 'ground contact time', '平均觸地時間', '觸地時間', 'gct', 'contact time'],
-    'vertical_osc': ['avg vertical oscillation', 'vertical oscillation', '平均垂直震幅', '垂直震幅', 'vertical ratio'],
+    'vertical_osc':   ['avg vertical oscillation', 'vertical oscillation', '平均垂直震幅', '垂直震幅'],
+    'step_length':    ['avg step length', 'step length', '平均步幅', '步幅', 'stride length'],
+    'vertical_ratio': ['avg vertical ratio', 'vertical ratio', '垂直步幅比', '移動效率', '垂直比'],
+    'gct_balance':    ['avg stance time balance', 'stance time balance', '觸地時間平衡', '左右平衡'],
+    'power':          ['avg power', 'power', '平均功率', '功率', 'watts'],
+    'ascent':         ['total ascent', 'ascent', '總爬升', '爬升', 'elevation gain'],
 }
 
 def _find_col(header_series, aliases):
@@ -190,25 +244,31 @@ def _apply_standard_processing(df, session_data):
     # 距離校正
     if 'distance' in df.columns:
         df['distance'] = pd.to_numeric(df['distance'], errors='coerce')
-        df['dist_km'] = df['distance'] / 1000 if df['distance'].max() > 500 else df['distance']
+        if 'dist_km' not in df.columns or df['dist_km'].isna().all():
+            df['dist_km'] = df['distance'] / 1000.0 if df['distance'].max() > 100 else df['distance']
+    if 'dist_km' in df.columns:
+        df['dist_km'] = pd.to_numeric(df['dist_km'], errors='coerce')
 
     # 心率
     if 'heart_rate' in df.columns:
         df['heart_rate'] = pd.to_numeric(df['heart_rate'], errors='coerce')
 
-    # 配速 5:30 → 5.5
-    if 'pace_str' in df.columns:
-        def p_to_f(p):
-            try:
-                if ':' in str(p):
-                    m, s = map(int, str(p).split(':'))
-                    return m + s / 60.0
-                return float(p)
-            except:
-                return np.nan
-        df['pace'] = df['pace_str'].apply(p_to_f)
+    # 配速：若尚未有有效數值 pace，才由 pace_str 反推
+    if 'pace' in df.columns:
+        df['pace'] = pd.to_numeric(df['pace'], errors='coerce')
+    if 'pace' not in df.columns or df['pace'].isna().all():
+        if 'pace_str' in df.columns:
+            def p_to_f(p):
+                try:
+                    if ':' in str(p):
+                        m, s = map(int, str(p).split(':'))
+                        return m + s / 60.0
+                    return float(p)
+                except:
+                    return np.nan
+            df['pace'] = df['pace_str'].apply(p_to_f)
 
-    for col in ['cadence', 'grade', 'elevation', 'gct', 'vertical_osc']:
+    for col in ['cadence', 'grade', 'elevation', 'gct', 'vertical_osc', 'step_length', 'vertical_ratio', 'gct_balance', 'power', 'ascent', 'descent']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 

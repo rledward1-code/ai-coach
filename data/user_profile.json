@@ -2,7 +2,16 @@
   "name": "Edward",
   "age": 56,
   "gender": "男",
+  "weight_kg": 59.0,
   "max_hr": 210,
-  "rest_hr": 60,
-  "threshold_hr": 193
+  "rest_hr": 56,
+  "lthr": 186,
+  "z2_min": 145,
+  "z2_max": 165,
+  "pb_full_time": "04:31:00",
+  "pb_half_time": "01:52:33",
+  "pb_full_min": 271.0,
+  "pb_half_min": 112.55,
+  "pb_full_label": "全馬 4:31:00 (2024台北馬)",
+  "pb_half_label": "半馬 1:52:33 (2025台北馬)"
 }
