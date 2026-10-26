@@ -110,11 +110,55 @@ python setup_autostart.py
 
 ---
 
-## 🤖 雙教練外腦架構 (Dual-Coach Architecture)
+## 🤖 雙教練外腦與 Antigravity / MCP 雲端協同架構 (Dual-Coach & Antigravity / MCP Architecture)
 
-本系統與 **Antigravity 雙教練會診協議** 深度整合：
-* **路格教練 (Coach Luger)**：運動生理學專家，專精於自律神經 HRV、乳酸閾值心率漂移與疲勞過載預警。
-* **佩絲教練 (Coach Pace)**：步態生物力學家，專精於觸地剛性、步頻轉換、垂直效率與大賽專項配速策略。
+本系統採用創新的**「雲端戰情看板 (Streamlit) ＋ 雲端數據樞紐 (Google Sheet) ＋ 本地外腦大腦 (Antigravity & MCP)」**三層解耦架構：
+
+```mermaid
+flowchart TD
+    subgraph Local["💻 本地端：Antigravity & MCP 外腦大腦"]
+        AG["🤖 Antigravity 雙教練會診中樞<br>(Coach Luger & Coach Pace)"]
+        MCP["🔌 MCP 專項工具箱<br>(Garmin API / GitHub / 本地科學運算)"]
+        AG <--> MCP
+    end
+
+    subgraph Bridge["☁️ 雲端雙向數據樞紐 (The Bridge)"]
+        GS["📊 Google Sheet 雲端試算表<br>(8週課表、動態微調紀錄、全賽季戰略)"]
+        GC["⌚ Garmin Connect Cloud<br>(每日 HRV、晨脈、身體電量、實跑 FIT)"]
+    end
+
+    subgraph Cloud["📱 雲端戰情前端：Streamlit Cloud (全球 24/7 在線)"]
+        UI["🏃‍♂️ edward-ai-coach.streamlit.app<br>Tab 1 ~ Tab 5 旗艦戰情看板<br>防水配速手環下載 / 視覺化大屏"]
+    end
+
+    AG -->|"雙教練微調課表 (Apps Script)"| GS
+    GS -->|"即時拉取最新課表 (0.5秒)"| UI
+    GC -->|"秒級帶入實跑活動"| UI
+    UI -->|"一鍵複製結構化會診 Prompt"| AG
+    AG -->|"Git Commit & Push (自動熱部署)"| Cloud
+```
+
+### 🤝 三大跨平台互動機制：
+
+1. **📊 課表雙向動態連動 (以 Google Sheet 為橋樑)**：
+   * **Streamlit 看板端**：隨時在手機或電腦開啟 Tab 2 檢視當前進度與最新課表。
+   * **Antigravity 教練端**：跑者與雙教練討論後，教練依體能與疲勞狀態自動發送微調指令至 Google 試算表。
+   * **極速同步**：試算表改動後，Streamlit 雲端看板每 3 分鐘自動快取更新（或隨時點擊 `🔄 刷新雲端課表`），**0.5 秒即時反映**！
+
+2. **🩺 一鍵臨床會診 (結構化提問對接外腦)**：
+   * 在 Streamlit 看板 **Tab 2** 與 **Tab 3** 專屬區塊中，系統會自動比對今日手錶實跑數據（里程、平均配速、平均心率、步頻）與今日目標課表。
+   * 自動組裝專業的 **雙教練臨床提問 Prompt**，跑者只需「一鍵複製」貼至 Antigravity 聊天室，即可無縫喚醒雙教練會診協議！
+
+3. **⚡ 自動化 DevOps (Antigravity 掌控雲端進化)**：
+   * Antigravity 透過本機環境與 GitHub MCP 擁有完整的 CI/CD 控制權。
+   * 任何新功能開發、演算法微調或 UI 升級，由 Antigravity 提交代碼後，**Streamlit Cloud 會在 30 秒內自動拉取並熱重載上線**，跑者零運維負擔！
+
+---
+
+### 👨‍🏫 雙教練臨床分工 (Dual-Coach Protocol)
+
+* **路格教練 (Coach Luger)**：運動生理學專家，專精於自律神經 HRV 平衡、乳酸閾值 (LTHR) 守護線、心率飄移成因解剖與疲勞過載預警。
+* **佩絲教練 (Coach Pace)**：步態生物力學家，專精於觸地剛性 (GCT)、步頻步幅自然轉換比、垂直振幅能效與大賽專項等速/負配速策略。
 
 ---
 
