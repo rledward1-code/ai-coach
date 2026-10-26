@@ -14,8 +14,10 @@ data/.garmin_activities_cache.json
 data/garmin_pmc_cache.json
 data/active_activity.json
 
-# 3. 測試草稿資料夾
+# 3. 測試草稿與本地專屬封存資料夾
 scratch/
+data/local_archive/
+data/knowledge_archive/
 
 # 4. Python 虛擬環境與快取
 venv*/
