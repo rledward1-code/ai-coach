@@ -16,14 +16,44 @@ import urllib.request
 import streamlit as st
 import pandas as pd
 
-GSHEET_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/edit?gid=279821330#gid=279821330"
-GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/export?format=csv&gid=279821330"
 SCHEDULE_JSON_PATH = "data/schedule_8weeks.json"
 
-def fetch_schedule_from_gsheet(save_local=True):
-    """直接向 Google 試算表 CSV 串流 API 拉取即時最新課表"""
+def get_gsheet_urls():
+    """
+    安全解析 Google Sheet 網址（依序檢查 Streamlit Secrets 與本地 keys.json，未設定則安全回退）
+    防止個人 Google 試算表 ID 外洩至公開 Git 儲存庫
+    """
+    sheet_url = ""
+    csv_url = ""
+
+    # 1. 優先檢查 Streamlit Secrets (雲端部署環境)
     try:
-        req = urllib.request.Request(GSHEET_CSV_URL, headers={"User-Agent": "Mozilla/5.0"})
+        if hasattr(st, "secrets"):
+            sheet_url = st.secrets.get("GOOGLE_SHEET_URL", "")
+            csv_url = st.secrets.get("GOOGLE_SHEET_CSV_URL", "")
+    except Exception:
+        pass
+
+    # 2. 次要檢查本地 keys.json (本地開發與離線環境)
+    if not sheet_url and os.path.exists("keys.json"):
+        try:
+            with open("keys.json", "r", encoding="utf-8") as f:
+                kdata = json.load(f)
+                sheet_url = kdata.get("GOOGLE_SHEET_URL", "")
+                csv_url = kdata.get("GOOGLE_SHEET_CSV_URL", "")
+        except Exception:
+            pass
+
+    return sheet_url, csv_url
+
+def fetch_schedule_from_gsheet(save_local=True):
+    """向 Google 試算表 CSV 串流 API 拉取即時最新課表 (若未設定金鑰則安全略過)"""
+    _, csv_url = get_gsheet_urls()
+    if not csv_url:
+        return []
+
+    try:
+        req = urllib.request.Request(csv_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as resp:
             content = resp.read().decode("utf-8")
             
@@ -200,28 +230,40 @@ def render_sidebar_schedule_card():
         </div>
         """, unsafe_allow_html=True)
 
-    st.link_button("🌐 開啟 Google Sheet 雲端課表", GSHEET_URL, use_container_width=True, help="直通 Google Sheet「2026 賽季」雲端課表")
+    sheet_url, _ = get_gsheet_urls()
+    if sheet_url:
+        st.link_button("🌐 開啟 Google Sheet 雲端課表", sheet_url, use_container_width=True, help="直通 Google Sheet「2026 賽季」雲端課表")
 
 def render_schedule_core_content(schedule):
     """核心課表呈現邏輯 (供 Tab 2 專屬使用)"""
     week_titles = [f"{w['week_title']} ({w['dates']}) - {w['theme']}" for w in schedule]
+    sheet_url, csv_url = get_gsheet_urls()
     
-    col_w, col_sync, col_link = st.columns([0.54, 0.23, 0.23])
+    if sheet_url:
+        col_w, col_sync, col_link = st.columns([0.54, 0.23, 0.23])
+    else:
+        col_w, col_sync = st.columns([0.72, 0.28])
+        col_link = None
+
     with col_w:
         selected_idx = st.selectbox("切換週次 (預設第 5 週・本週)", range(len(schedule)), format_func=lambda i: week_titles[i], index=0)
     with col_sync:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         if st.button("🔄 刷新雲端課表", use_container_width=True, help="立即從 Google 試算表拉取最新變更"):
-            with st.spinner("正在連線 Google Sheet..."):
-                fresh_data = load_schedule_data(force_reload=True)
-                if fresh_data:
-                    st.toast("✅ 已成功同步 Google Sheet 最新課表！", icon="🔄")
-                    st.rerun()
-                else:
-                    st.error("同步失敗，維持現有課表。")
-    with col_link:
-        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        st.link_button("🌐 開啟雲端試算表", GSHEET_URL, use_container_width=True)
+            if not csv_url:
+                st.info("💡 尚未設定 GOOGLE_SHEET_CSV_URL，目前使用本地安全課表。可在 keys.json 或 Streamlit Secrets 中設定。")
+            else:
+                with st.spinner("正在連線 Google Sheet..."):
+                    fresh_data = load_schedule_data(force_reload=True)
+                    if fresh_data:
+                        st.toast("✅ 已成功同步 Google Sheet 最新課表！", icon="🔄")
+                        st.rerun()
+                    else:
+                        st.error("同步失敗，維持現有課表。")
+    if col_link and sheet_url:
+        with col_link:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            st.link_button("🌐 開啟雲端試算表", sheet_url, use_container_width=True)
 
     week_data = schedule[selected_idx]
 
@@ -288,11 +330,18 @@ def render_schedule_core_content(schedule):
             else:
                 st.info("ℹ️ 尚未偵測到即時跑步活動。點擊側邊欄「⚡ 一鍵同步最新活動」即可帶入最新實跑數據。")
 
-            # 產生提問 Prompt
+            # 產生提問 Prompt (動態帶入當前跑者姓名與生理基線)
             workout_sample = workouts[0].get("workout", "").split("\n")[0] if workouts else "課表訓練"
+            u_prof = st.session_state.get("user_profile", {})
+            p_name = u_prof.get("name", "跑者")
+            p_max = st.session_state.get("base_max_hr", u_prof.get("max_hr", 190))
+            p_lthr = st.session_state.get("base_lthr", u_prof.get("lthr", 172))
+            p_z2_min = st.session_state.get("base_z2_min", u_prof.get("z2_min", 138))
+            p_z2_max = st.session_state.get("base_z2_max", u_prof.get("z2_max", 152))
+
             prompt_text = (
                 f"【雙教練會診請求】\n"
-                f"我是 Edward (生理基線: Max HR 197 / LTHR 181 / Zone 2: 144-159 bpm)。\n"
+                f"我是 {p_name} (生理基線: Max HR {p_max} / LTHR {p_lthr} / Zone 2: {p_z2_min}-{p_z2_max} bpm)。\n"
                 f"目前訓練進度為：{week_data['week_title']}（主題：{week_data['theme']}）。\n"
                 f"我今日執行的課表為：{workout_sample}。\n"
             )
