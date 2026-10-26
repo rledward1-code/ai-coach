@@ -12,39 +12,94 @@ import os
 import io
 import csv
 import json
+import re
 import urllib.request
 import streamlit as st
 import pandas as pd
 
 SCHEDULE_JSON_PATH = "data/schedule_8weeks.json"
 
+def derive_csv_url_from_sheet_url(sheet_url: str) -> str:
+    """
+    智慧解析：自動從任何標準 Google 試算表瀏覽網址推導出 CSV 串流匯出網址
+    使用者只需貼上瀏覽器網址，系統自動完成串流轉換
+    """
+    if not sheet_url or "docs.google.com/spreadsheets" not in sheet_url:
+        return ""
+    
+    # 提取試算表 ID
+    match_id = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", sheet_url)
+    if not match_id:
+        return ""
+    sheet_id = match_id.group(1)
+    
+    # 提取分頁 gid (若無則預設為 0)
+    match_gid = re.search(r"[#&?]gid=([0-9]+)", sheet_url)
+    gid = match_gid.group(1) if match_gid else "0"
+    
+    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+
 def get_gsheet_urls():
     """
-    安全解析 Google Sheet 網址（依序檢查 Streamlit Secrets 與本地 keys.json，未設定則安全回退）
+    安全解析 Google Sheet 網址
+    優先序：1. Session 狀態 (設定介面即時修改) -> 2. Streamlit Secrets -> 3. 本地 keys.json
     防止個人 Google 試算表 ID 外洩至公開 Git 儲存庫
     """
-    sheet_url = ""
-    csv_url = ""
+    sheet_url = st.session_state.get("GOOGLE_SHEET_URL", "")
+    csv_url = st.session_state.get("GOOGLE_SHEET_CSV_URL", "")
 
-    # 1. 優先檢查 Streamlit Secrets (雲端部署環境)
-    try:
-        if hasattr(st, "secrets"):
-            sheet_url = st.secrets.get("GOOGLE_SHEET_URL", "")
-            csv_url = st.secrets.get("GOOGLE_SHEET_CSV_URL", "")
-    except Exception:
-        pass
-
-    # 2. 次要檢查本地 keys.json (本地開發與離線環境)
-    if not sheet_url and os.path.exists("keys.json"):
+    # 1. 檢查 Streamlit Secrets (雲端部署環境)
+    if not sheet_url or not csv_url:
         try:
-            with open("keys.json", "r", encoding="utf-8") as f:
-                kdata = json.load(f)
-                sheet_url = kdata.get("GOOGLE_SHEET_URL", "")
-                csv_url = kdata.get("GOOGLE_SHEET_CSV_URL", "")
+            if hasattr(st, "secrets"):
+                if not sheet_url:
+                    sheet_url = st.secrets.get("GOOGLE_SHEET_URL", "")
+                if not csv_url:
+                    csv_url = st.secrets.get("GOOGLE_SHEET_CSV_URL", "")
         except Exception:
             pass
 
+    # 2. 檢查本地 keys.json (本地開發與離線環境)
+    if not sheet_url or not csv_url:
+        if os.path.exists("keys.json"):
+            try:
+                with open("keys.json", "r", encoding="utf-8") as f:
+                    kdata = json.load(f)
+                    if not sheet_url:
+                        sheet_url = kdata.get("GOOGLE_SHEET_URL", "")
+                    if not csv_url:
+                        csv_url = kdata.get("GOOGLE_SHEET_CSV_URL", "")
+            except Exception:
+                pass
+
+    # 若有 sheet_url 但無 csv_url，自動推導
+    if sheet_url and not csv_url:
+        csv_url = derive_csv_url_from_sheet_url(sheet_url)
+
     return sheet_url, csv_url
+
+def save_gsheet_settings(sheet_url: str, webhook_url: str = ""):
+    """儲存 Google 試算表設定至 session_state 與 keys.json (本機離線與即時工作階段)"""
+    csv_url = derive_csv_url_from_sheet_url(sheet_url)
+    st.session_state["GOOGLE_SHEET_URL"] = sheet_url
+    st.session_state["GOOGLE_SHEET_CSV_URL"] = csv_url
+    if webhook_url:
+        st.session_state["GOOGLE_SHEET_WEBHOOK_URL"] = webhook_url
+
+    # 若本地有 keys.json，一併持久化更新
+    if os.path.exists("keys.json"):
+        try:
+            with open("keys.json", "r", encoding="utf-8") as f:
+                kdata = json.load(f)
+            kdata["GOOGLE_SHEET_URL"] = sheet_url
+            kdata["GOOGLE_SHEET_CSV_URL"] = csv_url
+            if webhook_url:
+                kdata["GOOGLE_SHEET_WEBHOOK_URL"] = webhook_url
+            with open("keys.json", "w", encoding="utf-8") as f:
+                json.dump(kdata, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+    return csv_url
 
 def fetch_schedule_from_gsheet(save_local=True):
     """向 Google 試算表 CSV 串流 API 拉取即時最新課表 (若未設定金鑰則安全略過)"""

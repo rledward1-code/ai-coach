@@ -21,7 +21,14 @@ from plotly.subplots import make_subplots
 from data_processor import process_data
 import garmin_cloud
 from compare_view import render_compare_tab
-from training_schedule_view import render_sidebar_schedule_card, render_schedule_tab_section
+from training_schedule_view import (
+    render_sidebar_schedule_card,
+    render_schedule_tab_section,
+    get_gsheet_urls,
+    save_gsheet_settings,
+    derive_csv_url_from_sheet_url,
+    load_schedule_data
+)
 
 # --- 1. 頁面配置 ---
 st.set_page_config(
@@ -306,7 +313,7 @@ def open_profile_dialog():
     curr = st.session_state.get("user_profile", load_user_profile())
     st.caption("自訂跑者基本資訊、心率區間與歷史最佳成績，一鍵將整套 AI Coach 系統切換為您個人或新使用者的專屬教練！")
     
-    t_prof, t_hr, t_pb, t_garmin = st.tabs(["👤 基本資料", "💓 生理心率基線", "🏆 最佳戰績 (PB)", "☁️ Garmin 連結"])
+    t_prof, t_hr, t_pb, t_garmin, t_gsheet = st.tabs(["👤 基本資料", "💓 生理心率基線", "🏆 最佳戰績", "⌚ Garmin 綁定", "📊 Google 試算表"])
     
     with t_prof:
         c1, c2 = st.columns(2)
@@ -378,6 +385,63 @@ def open_profile_dialog():
                         st.error(vmsg)
             else:
                 st.warning("請輸入 API Token")
+
+    with t_gsheet:
+        cur_sheet_url, cur_csv_url = get_gsheet_urls()
+        cur_webhook = st.session_state.get("GOOGLE_SHEET_WEBHOOK_URL", "")
+        if not cur_webhook and os.path.exists("keys.json"):
+            try:
+                with open("keys.json", "r", encoding="utf-8") as f:
+                    cur_webhook = json.load(f).get("GOOGLE_SHEET_WEBHOOK_URL", "")
+            except Exception:
+                pass
+
+        st.markdown("<div style='font-size:0.85rem; color:#94a3b8; margin-bottom: 6px;'>連動個人 8 週課表 Google 試算表：</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; padding: 8px 12px; border-radius: 4px; font-size: 0.8rem; color: #bae6fd; margin-bottom: 12px;'>
+            💡 <strong>智慧解析</strong>：直接貼上瀏覽器中的 Google 試算表網址，系統會自動解析並推導即時 CSV 串流，完全無需手動拼湊匯出參數！
+        </div>
+        """, unsafe_allow_html=True)
+
+        in_sheet_url = st.text_input(
+            "Google 試算表瀏覽網址 (Sheet URL)",
+            value=cur_sheet_url,
+            placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=...",
+            help="開啟 Google 試算表後，直接複製瀏覽器網址列整串網址貼入即可"
+        )
+        
+        in_webhook_url = st.text_input(
+            "Google Apps Script Webhook 網址 (選填，用於雙向回寫同步)",
+            value=cur_webhook,
+            placeholder="https://script.google.com/macros/s/.../exec",
+            help="用於透過雙教練動態微調後自動回寫試算表"
+        )
+
+        c_g_save, c_g_test = st.columns(2)
+        with c_g_save:
+            if st.button("💾 儲存試算表設定", use_container_width=True):
+                if in_sheet_url:
+                    save_gsheet_settings(in_sheet_url.strip(), in_webhook_url.strip())
+                    st.cache_data.clear()
+                    st.success("✅ 試算表設定已儲存！")
+                    st.rerun()
+                else:
+                    save_gsheet_settings("", in_webhook_url.strip())
+                    st.info("已清空自訂試算表，系統恢復為本地安全課表。")
+                    st.rerun()
+                    
+        with c_g_test:
+            if st.button("🧪 測試連線並同步課表", use_container_width=True):
+                if in_sheet_url:
+                    save_gsheet_settings(in_sheet_url.strip(), in_webhook_url.strip())
+                    with st.spinner("連線 Google 試算表中..."):
+                        test_sched = load_schedule_data(force_reload=True)
+                        if test_sched:
+                            st.success(f"🎉 連線成功！已同步 {len(test_sched)} 週實戰課表。")
+                        else:
+                            st.error("連線失敗，請檢查網址或試算表共用權限。")
+                else:
+                    st.warning("請先輸入 Google 試算表網址")
 
     st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
     c_save, c_reset = st.columns([0.7, 0.3])
