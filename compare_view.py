@@ -17,26 +17,29 @@ def load_and_process_cached(file_path):
         return pd.DataFrame(), f"讀取錯誤: {str(e)}", []
 
 def get_comparison_library():
-    """收集精選 4 大代表賽事實績庫 (data/knowledge) 與手錶實戰"""
+    """收集代表賽事實績庫 (data/knowledge)、本地專屬封存庫 (data/local_archive) 與手錶實戰"""
     library = {}
     
-    # 歷史賽事實績庫 (精選 4 場核心戰役)
-    knowledge_dir = "data/knowledge"
-    if os.path.exists(knowledge_dir):
-        for f in sorted(os.listdir(knowledge_dir)):
-            if f.endswith(".fit") or f.endswith(".csv"):
-                clean_name = f.replace(".fit", "").replace(".csv", "")
-                if "2025" in clean_name and "台北馬" in clean_name:
-                    label = "🏆 2025 台北馬拉松 (半馬 PB 1:52:33)"
-                elif "2026" in clean_name and "長榮" in clean_name:
-                    label = "🥈 2026 長榮航空半程馬拉松 (最新實戰 2:01:08)"
-                elif "2025" in clean_name and "台南" in clean_name:
-                    label = "🍂 2025 台南秋季馬 (半馬 1:53:59)"
-                elif "2025" in clean_name and "渣打" in clean_name:
-                    label = "🏃 2025 渣打馬拉松 (半馬實績)"
-                else:
-                    label = f"📁 {clean_name}"
-                library[label] = os.path.join(knowledge_dir, f).replace("\\", "/")
+    # 歷史賽事實績庫 (精選公開庫 + 本地專屬封存庫)
+    search_dirs = ["data/knowledge", "data/local_archive"]
+    for k_dir in search_dirs:
+        if os.path.exists(k_dir):
+            for f in sorted(os.listdir(k_dir)):
+                if f.endswith(".fit") or f.endswith(".csv"):
+                    clean_name = f.replace(".fit", "").replace(".csv", "")
+                    if "2025" in clean_name and "台北馬" in clean_name:
+                        label = "🏆 2025 台北馬拉松 (半馬 PB 1:52:33)"
+                    elif "2026" in clean_name and "長榮" in clean_name:
+                        label = "🥈 2026 長榮航空半程馬拉松 (最新實戰 2:01:08)"
+                    elif "2025" in clean_name and "台南" in clean_name:
+                        label = "🍂 2025 台南秋季馬 (半馬 1:53:59)"
+                    elif "2025" in clean_name and "渣打" in clean_name:
+                        label = "🏃 2025 渣打馬拉松 (半馬實績)"
+                    else:
+                        label = f"📁 {clean_name}"
+                    full_p = os.path.join(k_dir, f).replace("\\", "/")
+                    if label not in library:
+                        library[label] = full_p
 
     # 當前手錶最新同步活動 (temp.fit)
     if os.path.exists("temp.fit") and "temp.fit" not in library.values():

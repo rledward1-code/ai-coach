@@ -296,6 +296,7 @@ def load_user_profile():
         "pb_full_label": "全馬 4:15:00 (範例賽事)",
         "pb_half_label": "半馬 1:55:00 (範例賽事)"
     }
+    # 1. 讀取通用範本 (由 Git 追蹤)
     p_path = "data/user_profile.json"
     if os.path.exists(p_path):
         try:
@@ -304,12 +305,24 @@ def load_user_profile():
                 defaults.update(data)
         except Exception:
             pass
+            
+    # 2. 本地優先覆蓋：若存在本地專屬設定檔 (受 .gitignore 保護)，無縫套用個人真實數據
+    for local_p in ["data/user_profile_local.json", "data/edward_physiology.json"]:
+        if os.path.exists(local_p):
+            try:
+                with open(local_p, "r", encoding="utf-8") as f:
+                    local_data = json.load(f)
+                    defaults.update(local_data)
+                    break
+            except Exception:
+                pass
     return defaults
 
 def save_user_profile(data):
-    p_path = "data/user_profile.json"
-    os.makedirs(os.path.dirname(p_path), exist_ok=True)
-    with open(p_path, "w", encoding="utf-8") as f:
+    # 本地儲存一律優先寫入 user_profile_local.json (受 .gitignore 保護，絕不污染 Git)
+    local_p = "data/user_profile_local.json"
+    os.makedirs(os.path.dirname(local_p), exist_ok=True)
+    with open(local_p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 if "user_profile" not in st.session_state:

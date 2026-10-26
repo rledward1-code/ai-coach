@@ -346,24 +346,29 @@ def get_runner_full_profile() -> Dict[str, Any]:
 get_edward_full_profile = get_runner_full_profile
 
 def search_race_vault(query: str = "") -> List[Dict[str, Any]]:
-    """檢索 data/knowledge 中的歷年大賽與歷史訓練檔案"""
-    knowledge_dir = os.path.join(PROJECT_ROOT, "data", "knowledge")
-    if not os.path.exists(knowledge_dir):
-        return []
-
-    files = os.listdir(knowledge_dir)
+    """檢索 data/knowledge 與本地 data/local_archive 中的歷年大賽與歷史訓練檔案"""
+    search_dirs = [
+        os.path.join(PROJECT_ROOT, "data", "knowledge"),
+        os.path.join(PROJECT_ROOT, "data", "local_archive")
+    ]
     results = []
     q_lower = query.lower()
+    seen_files = set()
 
-    for f in sorted(files):
-        if f.endswith(('.fit', '.xlsx', '.pdf', '.jpg', '.csv')):
-            if not query or q_lower in f.lower():
-                full_p = os.path.join(knowledge_dir, f)
-                sz = os.path.getsize(full_p)
-                results.append({
-                    "filename": f,
-                    "size_bytes": sz,
-                    "type": f.split('.')[-1].upper(),
-                    "path": full_p
-                })
+    for k_dir in search_dirs:
+        if not os.path.exists(k_dir):
+            continue
+        files = os.listdir(k_dir)
+        for f in sorted(files):
+            if f.endswith(('.fit', '.xlsx', '.pdf', '.jpg', '.csv')):
+                if f not in seen_files and (not query or q_lower in f.lower()):
+                    seen_files.add(f)
+                    full_p = os.path.join(k_dir, f)
+                    sz = os.path.getsize(full_p)
+                    results.append({
+                        "filename": f,
+                        "size_bytes": sz,
+                        "type": f.split('.')[-1].upper(),
+                        "path": full_p
+                    })
     return results

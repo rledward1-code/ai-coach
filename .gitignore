@@ -40,3 +40,6 @@ Thumbs.db
 .agents/**/edward_physiology.md
 assets/Edward.png
 assets/edward.png
+data/*_local.json
+data/*.local.json
+data/user_profile_local.json
