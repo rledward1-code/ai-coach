@@ -838,7 +838,7 @@ with st.sidebar:
 
     st.divider()
     with st.expander("🎬 系統實戰操作示範影片", expanded=False):
-        st.video("https://youtu.be/b9mxSmkRjIg")
+        st.video("https://youtu.be/bJ0Z1epmm8Q")
         st.caption("📺 跑步運動科學 - AI 教練系統操作展示")
 
 # --- 5. 主畫面：三大分頁戰情看板 ---

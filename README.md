@@ -1,7 +1,7 @@
 # 🏃 AI Coach 運動科學戰情看板 (Sports Science Dashboard)
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://edward-ai-coach.streamlit.app/)
-[![YouTube Demo](https://img.shields.io/badge/YouTube-實戰展示影片-red?logo=youtube)](https://youtu.be/b9mxSmkRjIg)
+[![YouTube Demo](https://img.shields.io/badge/YouTube-實戰展示影片-red?logo=youtube)](https://youtu.be/bJ0Z1epmm8Q)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -15,8 +15,8 @@
 
 ## 📺 系統實戰展示影片 (Video Walkthrough)
 
-[![跑步運動科學 - AI 教練系統實戰示範](https://i.ytimg.com/vi/b9mxSmkRjIg/hqdefault.jpg)](https://youtu.be/b9mxSmkRjIg)  
-*🎬 點擊上方圖片前往觀看 YouTube 系統操作與雙教練會診展示 (https://youtu.be/b9mxSmkRjIg)*
+[![跑步運動科學 - AI 教練系統實戰示範](https://i.ytimg.com/vi/bJ0Z1epmm8Q/hqdefault.jpg)](https://youtu.be/bJ0Z1epmm8Q)  
+*🎬 點擊上方圖片前往觀看 YouTube 系統操作與雙教練會診展示 (https://youtu.be/bJ0Z1epmm8Q)*
 
 ---
 
