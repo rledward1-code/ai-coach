@@ -167,6 +167,7 @@ flowchart TD
 
 * **路格教練 (Coach Luger)**：運動生理學專家，專精於自律神經 HRV 平衡、乳酸閾值 (LTHR) 守護線、心率飄移成因解剖與疲勞過載預警。
 * **佩絲教練 (Coach Pace)**：步態生物力學家，專精於觸地剛性 (GCT)、步頻步幅自然轉換比、垂直振幅能效與大賽專項等速/負配速策略。
+* 🔌 **外接 AI 工具箱**：本專案內建標準 Model Context Protocol 伺服器，支援一鍵掛接 Claude Desktop、Antigravity 與 Cursor，詳情請見 👉 [**MCP 伺服器使用手冊 (mcp_server/README.md)**](mcp_server/README.md)。
 
 ---
 

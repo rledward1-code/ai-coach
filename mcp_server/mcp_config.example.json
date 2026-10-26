@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "ai-coach": {
+      "command": "python",
+      "args": [
+        "path/to/ai-coach/mcp_server/server.py"
+      ],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
