@@ -18,6 +18,8 @@ import streamlit as st
 import pandas as pd
 
 SCHEDULE_JSON_PATH = "data/schedule_8weeks.json"
+DEFAULT_GSHEET_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/edit?gid=279821330#gid=279821330"
+DEFAULT_GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/export?format=csv&gid=279821330"
 
 def derive_csv_url_from_sheet_url(sheet_url: str) -> str:
     """
@@ -76,6 +78,12 @@ def get_gsheet_urls():
     if sheet_url and not csv_url:
         csv_url = derive_csv_url_from_sheet_url(sheet_url)
 
+    # 若皆未設定，回退至系統預設 Demo 試算表
+    if not sheet_url:
+        sheet_url = DEFAULT_GSHEET_URL
+    if not csv_url:
+        csv_url = DEFAULT_GSHEET_CSV_URL
+
     return sheet_url, csv_url
 
 def save_gsheet_settings(sheet_url: str, webhook_url: str = ""):
@@ -118,8 +126,14 @@ def fetch_schedule_from_gsheet(save_local=True):
         schedule = []
         curr_week = None
         
-        # 課表從第 16 列 (索引 15) 開始
-        for r in all_rows[15:45]:
+        # 智慧尋找表頭 (容許任何排版變動)
+        start_idx = 1
+        for idx, r in enumerate(all_rows):
+            if r and len(r) >= 2 and ("訓練日" in r[1] or "週次" in r[0]):
+                start_idx = idx + 1
+                break
+                
+        for r in all_rows[start_idx:]:
             if not r or len(r) < 3:
                 continue
                 
@@ -134,7 +148,7 @@ def fetch_schedule_from_gsheet(save_local=True):
                 
             if w_col:
                 lines = [x.strip() for x in w_col.split("\n") if x.strip()]
-                w_title = lines[0] if len(lines) > 0 else f"第 {len(schedule)+5} 週"
+                w_title = lines[0] if len(lines) > 0 else f"第 {len(schedule)+1} 週"
                 w_dates = lines[1] if len(lines) > 1 else ""
                 w_theme = lines[2] if len(lines) > 2 else ""
                 curr_week = {
@@ -197,9 +211,12 @@ def load_schedule_data(force_reload=False):
     return []
 
 def get_current_week_info(schedule_data):
-    """取得當前預設或選定的週次資料 (預設為 Week 5: 10/26 - 11/01)"""
+    """取得當前週次資料 (優先定位本週 10/26，若無則回傳第一筆)"""
     if not schedule_data:
         return None
+    for w in schedule_data:
+        if "10/26" in w.get("dates", "") or "第 5 週" in w.get("week_title", ""):
+            return w
     return schedule_data[0]
 
 def get_active_activity_metrics():
@@ -294,6 +311,13 @@ def render_schedule_core_content(schedule):
     week_titles = [f"{w['week_title']} ({w['dates']}) - {w['theme']}" for w in schedule]
     sheet_url, csv_url = get_gsheet_urls()
     
+    # 智慧定位預設週次 (尋找當前本週，如第 5 週)
+    default_idx = 0
+    for idx, w in enumerate(schedule):
+        if "10/26" in w.get("dates", "") or "第 5 週" in w.get("week_title", ""):
+            default_idx = idx
+            break
+
     if sheet_url:
         col_w, col_sync, col_link = st.columns([0.54, 0.23, 0.23])
     else:
@@ -301,7 +325,7 @@ def render_schedule_core_content(schedule):
         col_link = None
 
     with col_w:
-        selected_idx = st.selectbox("切換週次 (預設第 5 週・本週)", range(len(schedule)), format_func=lambda i: week_titles[i], index=0)
+        selected_idx = st.selectbox("切換週次 (預設第 5 週・本週)", range(len(schedule)), format_func=lambda i: week_titles[i], index=default_idx)
     with col_sync:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         if st.button("🔄 刷新雲端課表", use_container_width=True, help="立即從 Google 試算表拉取最新變更"):
