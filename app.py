@@ -456,7 +456,15 @@ def open_profile_dialog():
 with st.sidebar:
     c_av, c_name, c_sett = st.columns([0.28, 0.44, 0.28])
     with c_av:
-        st.image("assets/edward.png" if os.path.exists("assets/edward.png") else "🏃", width=50)
+        avatar_path = None
+        for p in ["assets/Edward.png", "assets/edward.png"]:
+            if os.path.exists(p):
+                avatar_path = p
+                break
+        if avatar_path:
+            st.image(avatar_path, width=50)
+        else:
+            st.markdown("<div style='font-size: 2.2rem; line-height: 1;'>🏃</div>", unsafe_allow_html=True)
     with c_name:
         display_name = user_name if user_name else "跑者"
         st.markdown(f"<div style='padding-top: 4px; font-weight: 700; font-size: 1.15rem; color: #f8fafc; line-height: 1.2;'>{display_name}</div><div style='font-size: 0.72rem; color: #94a3b8;'>運動員基線</div>", unsafe_allow_html=True)
