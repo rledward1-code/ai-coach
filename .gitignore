@@ -8,7 +8,7 @@ keys.json
 data/.garmin_token_cache.json
 
 # 2. 暫存活動與即時快取
-temp*
+temp_*
 *.tmp
 data/.garmin_activities_cache.json
 data/garmin_pmc_cache.json

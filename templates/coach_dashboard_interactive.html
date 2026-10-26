@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>雙教練運動科學會診室 & 課表微調模擬器 (旗艦全能版)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    input[type=range] { accent-color: #3b82f6; }
+    .badge-glow-green { box-shadow: 0 0 12px rgba(34, 197, 94, 0.4); }
+    .badge-glow-yellow { box-shadow: 0 0 12px rgba(234, 179, 8, 0.4); }
+    .badge-glow-red { box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); }
+    /* 自訂滾動條 */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-[#0f172a] text-slate-100 antialiased p-2 select-none overflow-x-hidden">
+
+  <!-- 主卡片容器 (自適應全寬，消除縱向滾動) -->
+  <div class="bg-[#1e293b] text-slate-100 border border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-2xl w-full max-w-7xl mx-auto space-y-3.5">
+    
+    <!-- 頂部：標題、模式切換 Tab -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-700/80 pb-4 gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🏃‍♂️</span>
+          <h2 class="text-lg font-bold tracking-tight text-white">AI Coach 運動科學戰情微調模擬器</h2>
+        </div>
+        <p class="text-xs text-slate-300 mt-0.5">跑者：個人 | Max HR 210 | Rest HR 53 | LTHR 193 | Zone 2: 148-163 bpm</p>
+      </div>
+
+      <!-- 四大訓練/賽事模式 Tab -->
+      <div class="inline-flex rounded-xl bg-slate-900/90 p-1.5 border border-slate-700 gap-1 self-start sm:self-auto">
+        <button id="tab-interval" onclick="switchMode('interval')" class="mode-btn px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white transition-all shadow">⚡ 間歇跑</button>
+        <button id="tab-tempo" onclick="switchMode('tempo')" class="mode-btn px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white rounded-lg transition-all">⏱️ 節奏跑</button>
+        <button id="tab-lsd" onclick="switchMode('lsd')" class="mode-btn px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white rounded-lg transition-all">🏃 LSD 有氧</button>
+        <button id="tab-race" onclick="switchMode('race')" class="mode-btn px-3 py-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 rounded-lg transition-all">🏆 大賽推演</button>
+      </div>
+    </div>
+
+    <!-- 🌡️ 全域環境條件：氣候與溫濕度補償條 (先決環境條件，全局動態連動) -->
+    <div class="bg-slate-900/90 border border-amber-500/30 rounded-xl p-3 shadow-md">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-base">🌡️</span>
+          <span class="text-xs font-bold text-amber-300">環境氣象與生理熱負荷補償 (全域先決條件)</span>
+          <span id="temp-badge" class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">體感舒適 (18°C)</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="text-slate-400">心率熱漂移：<strong id="temp-hr-offset" class="text-rose-400 font-mono font-bold">+0 bpm</strong></span>
+          <span class="text-slate-600">|</span>
+          <span class="text-slate-400">大賽配速折損：<strong id="temp-pace-decay" class="text-amber-300 font-mono font-bold">+0 s/km</strong></span>
+          <span class="text-slate-600">|</span>
+          <span class="text-slate-400">電解質補水：<strong id="temp-hydration" class="text-sky-300 font-mono font-bold">450 ml/hr</strong></span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-[11px] text-slate-400 font-mono">8°C</span>
+        <input id="temp-slider" type="range" min="8" max="34" value="18" step="1" oninput="updateSimulation()" class="w-full h-2 bg-slate-800 rounded-lg cursor-pointer accent-amber-500">
+        <span class="text-[11px] text-slate-400 font-mono">34°C</span>
+        <div class="min-w-[68px] text-right">
+          <span id="temp-val-display" class="font-mono text-amber-300 font-bold text-sm bg-slate-800 px-2 py-1 rounded border border-slate-700">18 °C</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中段核心戰情區：左右雙欄自適應並排 (大幅降低縱深，一目了然) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+
+      <!-- 左欄 (5 欄)：雙教練即時會診面板 + 跑鞋裝備庫匹配 -->
+      <div class="lg:col-span-5 flex flex-col gap-2.5">
+
+        <!-- 雙教練即時會診面板 -->
+        <div class="flex flex-col gap-2.5 flex-1">
+          <!-- 路格教練 -->
+          <div class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-3 flex flex-col justify-between shadow-inner flex-1">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-1.5">
+                <span class="text-base">🛡️</span>
+                <span class="text-xs font-bold text-slate-200">路格教練 (生化與心率守門人)</span>
+              </div>
+              <span id="luger-status-badge" class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 badge-glow-green">
+                🟢 安全有氧
+              </span>
+            </div>
+            <p id="luger-comment" class="text-xs text-slate-300 leading-relaxed min-h-[40px]">
+              有氧基底是長跑靈魂。設定心率在安全 Zone 2 區間，燃脂供能效率最佳。
+            </p>
+            <div class="mt-1.5 pt-1.5 border-t border-slate-800 flex justify-between items-center text-[11px] text-slate-400">
+              <span>預估心率區間：<strong id="luger-hr-target" class="text-emerald-400 font-mono text-xs">152 - 162 bpm</strong></span>
+              <span>Zone 2 守衛率：<strong id="luger-zone2-ratio" class="text-slate-200 font-mono">92%</strong></span>
+            </div>
+          </div>
+
+          <!-- 佩絲教練 -->
+          <div class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-3 flex flex-col justify-between shadow-inner flex-1">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-1.5">
+                <span class="text-base">⚡</span>
+                <span class="text-xs font-bold text-slate-200">佩絲教練 (配速與專項推進者)</span>
+              </div>
+              <span id="pace-status-badge" class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                🎯 目標鎖定
+              </span>
+            </div>
+            <p id="pace-comment" class="text-xs text-slate-300 leading-relaxed min-h-[40px]">
+              維持步頻 182-186 spm，控制觸地時間在 220ms 以內，力量推進輸出穩定！
+            </p>
+            <div class="mt-1.5 pt-1.5 border-t border-slate-800 flex justify-between items-center text-[11px] text-slate-400">
+              <span>運動負荷 TRIMP：<strong id="pace-trimp-val" class="text-blue-400 font-mono text-xs">118</strong></span>
+              <span>推薦步頻：<strong id="pace-target-cadence" class="text-slate-200 font-mono">184 spm</strong></span>
+            </div>
+          </div>
+        </div>
+
+
+
+      </div>
+
+      <!-- 右欄 (7 欄)：參數微調滑桿區塊 (依據 Tab 動態切換顯示) -->
+      <div class="lg:col-span-7 bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between">
+
+      <!-- ================= 模式 1: 間歇跑 ================= -->
+      <div id="controls-interval" class="mode-control-group space-y-3">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-bold text-blue-400">⚡ 間歇跑強度調校 (800m / 1000m 亞索)</span>
+          <span class="text-[11px] text-slate-400">預估單趟耗時：<span id="interval-single-time" class="font-mono text-white font-bold">3分45秒</span></span>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">趟配速 (Pace)</span>
+            <span id="interval-pace-display" class="font-mono font-bold text-blue-400">3:45 /km</span>
+          </div>
+          <input id="interval-pace" type="range" min="195" max="270" value="225" step="5" oninput="updateSimulation()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-300">組數 (Reps)</span>
+              <span id="interval-reps-display" class="font-mono font-bold text-white">6 組</span>
+            </div>
+            <input id="interval-reps" type="range" min="3" max="12" value="6" step="1" oninput="updateSimulation()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-300">組間動態恢復</span>
+              <span id="interval-rest-display" class="font-mono font-bold text-white">90 秒</span>
+            </div>
+            <input id="interval-rest" type="range" min="45" max="180" value="90" step="15" oninput="updateSimulation()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= 模式 2: 節奏跑 ================= -->
+      <div id="controls-tempo" class="mode-control-group space-y-3 hidden">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-bold text-emerald-400">⏱️ 乳酸閾值節奏跑 (Tempo / MP 配速)</span>
+          <span class="text-[11px] text-slate-400">總訓練時間：<span id="tempo-total-time" class="font-mono text-white font-bold">48分00秒</span></span>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">定速配速 (Pace)</span>
+            <span id="tempo-pace-display" class="font-mono font-bold text-emerald-400">4:48 /km</span>
+          </div>
+          <input id="tempo-pace" type="range" min="260" max="340" value="288" step="2" oninput="updateSimulation()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">持續里程 (Distance)</span>
+            <span id="tempo-dist-display" class="font-mono font-bold text-white">10.0 km</span>
+          </div>
+          <input id="tempo-dist" type="range" min="5" max="16" value="10" step="1" oninput="updateSimulation()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+        </div>
+      </div>
+
+      <!-- ================= 模式 3: 長距離 LSD ================= -->
+      <div id="controls-lsd" class="mode-control-group space-y-3 hidden">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-bold text-purple-400">🏃 長距離慢跑 (LSD Zone 2 燃脂固底)</span>
+          <span class="text-[11px] text-slate-400">預計總耗時：<span id="lsd-total-time" class="font-mono text-white font-bold">2小時12分</span></span>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">巡航配速 (Pace)</span>
+            <span id="lsd-pace-display" class="font-mono font-bold text-purple-400">5:30 /km</span>
+          </div>
+          <input id="lsd-pace" type="range" min="300" max="450" value="390" step="5" oninput="updateSimulation()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">目標里程 (Distance)</span>
+            <span id="lsd-dist-display" class="font-mono font-bold text-white">24.0 km</span>
+          </div>
+          <input id="lsd-dist" type="range" min="15" max="35" value="24" step="1" oninput="updateSimulation()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+        </div>
+      </div>
+
+      <!-- ================= 模式 4: 大賽沙盤推演 (Peter Riegel + VDOT) ================= -->
+      <div id="controls-race" class="mode-control-group space-y-3 hidden">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-bold text-amber-400">🏆 賽事沙盤推演 (Peter Riegel / VDOT 跑力預測)</span>
+          <span class="text-[11px] text-slate-300">基準實績：<strong class="text-amber-300">全馬 4:31:00 (2024台北馬) / 半馬 1:52:33</strong></span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <button id="btn-race-5k" type="button" onclick="setRaceDistance(5, '5K 測速', 24.5, 'btn-race-5k')" class="race-dist-btn py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-center transition-all">5K 測速</button>
+          <button id="btn-race-10k" type="button" onclick="setRaceDistance(10, '10K 挑戰', 51.0, 'btn-race-10k')" class="race-dist-btn py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-center transition-all">10K 挑戰</button>
+          <button id="btn-race-half" type="button" onclick="setRaceDistance(21.0975, '半程馬拉松', 112.55, 'btn-race-half')" class="race-dist-btn py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-center transition-all">半馬 21.1K</button>
+          <button id="btn-race-full" type="button" onclick="setRaceDistance(42.195, '全程馬拉松', 271.0, 'btn-race-full')" class="race-dist-btn py-1.5 px-2 rounded-lg text-xs font-bold bg-amber-600/30 text-amber-300 border border-amber-500/50 text-center transition-all">全馬 42.2K</button>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">目標完賽時間調整 (Target Time)</span>
+            <span id="race-target-time-display" class="font-mono font-bold text-amber-400 text-sm">4小時31分00秒</span>
+          </div>
+          <input id="race-target-slider" type="range" min="200" max="340" value="271" step="1" oninput="updateSimulation()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+        </div>
+        <div class="flex justify-between items-center text-xs text-slate-300 bg-slate-800/80 p-2.5 rounded-lg border border-slate-700/60">
+          <span>對應平均配速：<strong id="race-calc-pace" class="font-mono text-amber-300 font-bold">6:25 /km</strong></span>
+          <span>VDOT 跑力預測值：<strong id="race-vdot-val" class="font-mono text-emerald-400 font-bold">34.5</strong></span>
+          <span>配速策略：
+            <select id="race-pacing-strategy" onchange="updateSimulation()" class="bg-slate-900 text-xs text-slate-200 border border-slate-700 rounded px-1.5 py-0.5">
+              <option value="negative" selected>負分段後程加速 (Negative - 破PB首選)</option>
+              <option value="even">等速均速巡航 (Even - 節奏平穩)</option>
+              <option value="parabolic">U型巡航衝刺 (Parabolic - 終點激發)</option>
+              <option value="positive">正分段穩健防守 (Positive - 逆風/抗衰)</option>
+            </select>
+          </span>
+        </div>
+      </div>
+
+
+
+      </div> <!-- /lg:col-span-7 -->
+
+    </div> <!-- /grid lg:grid-cols-12 -->
+
+    <!-- 防水配速手環生成器 (擴充功能 1) -->
+    <div id="wristband-section" class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-amber-500/40 rounded-xl p-3.5 space-y-2.5">
+      <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🪪</span>
+          <span class="text-xs font-bold text-amber-300">防水配速手環生成器 (Pacing Wristband Canvas)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="generateWristbandCanvas(true)" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-600 hover:bg-amber-500 active:scale-95 text-white transition-all shadow flex items-center gap-1.5 cursor-pointer">
+            <span>🎨 繪製手環</span>
+          </button>
+          <button type="button" onclick="downloadWristbandImage()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white transition-all shadow flex items-center gap-1.5 cursor-pointer">
+            <span>💾 下載手環圖檔 (PNG)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 繪製回饋提示條 -->
+      <div id="wristband-alert" class="hidden text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg p-2 text-center font-bold transition-all">
+        ✨ 配速手環已依據最新完賽目標與策略重新繪製完成！請見下方畫布：
+      </div>
+
+      <!-- 手環預覽畫布 (Canvas 超高解析度 2X Retina，自適應拉寬) -->
+      <div id="canvas-container" class="overflow-x-auto py-1.5 flex justify-center bg-slate-950/90 rounded-lg p-2 border border-slate-800 transition-all">
+        <canvas id="wristbandCanvas" width="1560" height="240" style="width: 100%; max-width: 1160px; height: auto;" class="rounded shadow-md max-w-full"></canvas>
+      </div>
+      <p class="text-[10px] text-slate-400 text-center">
+        💡 提示：按「下載手環圖檔」後存檔，可彩色列印並貼上寬版透明防水膠帶，即可裁切作為馬拉松賽事實體防水手環！
+      </p>
+    </div>
+
+  </div>
+
+  <script>
+    // Edward 生理基準
+    const BASELINE = {
+      runnerName: "跑者",
+      maxHR: 210,
+      restHR: 53,
+      lthr: 193,
+      z2_min: 148,
+      z2_max: 163,
+      vdot_base: 35.0,
+      marathon_time_min: 271, // 4:31:00 (2024 台北馬全馬 PB)
+      half_marathon_time_min: 112.55 // 1:52:33 (2025 台北馬半馬 PB)
+    };
+
+    let currentMode = 'interval';
+    let currentRaceDist = 42.195;
+    let currentRaceName = '全程馬拉松';
+    let currentRaceTargetMin = 271;
+
+    // 鞋櫃資料庫 (擷取自 Edward 知識庫跑鞋清單)
+    const SHOE_VAULT = {
+      interval: {
+        name: "Nike Vaporfly 4 / Zoom Fly 6",
+        desc: "輕量高回彈碳板，適合間歇高步頻衝刺與動態蹬伸。",
+        mileage: 145,
+        maxMileage: 500,
+        tag: "間歇/衝刺專用"
+      },
+      tempo: {
+        name: "Asics Magic Speed 3 / Deviate Nitro 2",
+        desc: "兼具滾動推進與抓地剛性，適合乳酸閾值配速訓練。",
+        mileage: 260,
+        maxMileage: 650,
+        tag: "節奏/乳酸閾值專用"
+      },
+      lsd: {
+        name: "Puma Deviate Nitro 2 / Superblast",
+        desc: "極致緩震保護膝蓋與阿基里斯腱，超長距離穩態輸出首選。",
+        mileage: 380,
+        maxMileage: 800,
+        tag: "長距離LSD緩震首選"
+      },
+      race_5k: {
+        name: "Nike Vaporfly 4 / Takumi Sen 11",
+        desc: "超羽量爆發設計，極限壓榨 VO2max 跑力。",
+        mileage: 95,
+        maxMileage: 400,
+        tag: "短程極速戰靴"
+      },
+      race_half: {
+        name: "Nike Vaporfly 3 / Metaspeed Edge+",
+        desc: "高推進滾動感，兼具半馬 21K 支撐性與抗疲勞。",
+        mileage: 180,
+        maxMileage: 550,
+        tag: "半馬競速旗艦"
+      },
+      race_full: {
+        name: "Mizuno Wave Rebellion Pro 2 / Alphafly 3",
+        desc: "中前掌極致切角幾何，全馬 42.195K 破 PB 終極神兵。",
+        mileage: 210,
+        maxMileage: 600,
+        tag: "全馬破 PB 戰靴"
+      }
+    };
+
+    function switchMode(mode) {
+      currentMode = mode;
+      
+      // 更新 Tab 樣式
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.className = "mode-btn px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white rounded-lg transition-all";
+      });
+      const activeBtn = document.getElementById('tab-' + mode);
+      if (activeBtn) {
+        if (mode === 'race') {
+          activeBtn.className = "mode-btn px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-600 text-white transition-all shadow";
+        } else {
+          activeBtn.className = "mode-btn px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white transition-all shadow";
+        }
+      }
+
+      // 切換控制面板
+      document.querySelectorAll('.mode-control-group').forEach(grp => grp.classList.add('hidden'));
+      const activeGrp = document.getElementById('controls-' + mode);
+      if (activeGrp) activeGrp.classList.remove('hidden');
+
+      // 只有在 race 模式或長跑時展開手環區塊
+      const wristbandSection = document.getElementById('wristband-section');
+      if (mode === 'race') {
+        wristbandSection.classList.remove('hidden');
+      } else {
+        wristbandSection.classList.add('hidden');
+      }
+
+      updateSimulation();
+    }
+
+    function setRaceDistance(distKm, name, defTargetMin, btnId) {
+      currentRaceDist = distKm;
+      currentRaceName = name;
+      currentRaceTargetMin = defTargetMin;
+
+      // 更新按鈕樣式
+      document.querySelectorAll('.race-dist-btn').forEach(b => {
+        b.className = "race-dist-btn py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-center transition-all";
+      });
+      if (!btnId) {
+        if (distKm <= 5) btnId = 'btn-race-5k';
+        else if (distKm <= 10) btnId = 'btn-race-10k';
+        else if (distKm <= 21.1) btnId = 'btn-race-half';
+        else btnId = 'btn-race-full';
+      }
+      const activeBtn = document.getElementById(btnId);
+      if (activeBtn) {
+        activeBtn.className = "race-dist-btn py-1.5 px-2 rounded-lg text-xs font-bold bg-amber-600/30 text-amber-300 border border-amber-500/50 text-center transition-all";
+      }
+
+      // 更新滑桿範圍與數值
+      const slider = document.getElementById('race-target-slider');
+      if (slider) {
+        slider.min = Math.round(defTargetMin * 0.75);
+        slider.max = Math.round(defTargetMin * 1.4);
+        slider.value = Math.round(defTargetMin);
+      }
+
+      updateSimulation();
+    }
+
+    function formatTime(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = Math.floor(totalSeconds % 60);
+      if (h > 0) {
+        return `${h}小時${m}分${s > 0 ? s + '秒' : '00秒'}`;
+      }
+      return `${m}分${s > 0 ? s + '秒' : '00秒'}`;
+    }
+
+    function formatPace(paceSec) {
+      const m = Math.floor(paceSec / 60);
+      const s = Math.floor(paceSec % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function updateSimulation() {
+      // 讀取天氣設定
+      const tempC = parseInt(document.getElementById('temp-slider').value);
+      document.getElementById('temp-val-display').innerText = `${tempC} °C`;
+      
+      let tempHrOffset = 0;
+      let tempPaceDecaySec = 0;
+      let hydrationMl = 450;
+      let tempBadgeText = "舒適涼爽";
+      let tempBadgeClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+
+      if (tempC < 16) {
+        tempBadgeText = "極佳破 PB 低溫 (10-15°C)";
+        tempBadgeClass = "bg-blue-500/20 text-blue-300 border-blue-500/30";
+        hydrationMl = 400;
+      } else if (tempC <= 21) {
+        tempBadgeText = "氣溫宜人 (16-21°C)";
+        tempBadgeClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+        hydrationMl = 500;
+        tempHrOffset = Math.round((tempC - 18) * 0.8);
+      } else if (tempC <= 26) {
+        tempBadgeText = "偏熱微悶 (22-26°C)";
+        tempBadgeClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+        tempHrOffset = Math.round(3 + (tempC - 21) * 1.5);
+        tempPaceDecaySec = Math.round((tempC - 21) * 2.5);
+        hydrationMl = 650;
+      } else {
+        tempBadgeText = "高溫高濕警報 (>27°C)";
+        tempBadgeClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+        tempHrOffset = Math.round(10 + (tempC - 26) * 2);
+        tempPaceDecaySec = Math.round(12 + (tempC - 26) * 4);
+        hydrationMl = 850;
+      }
+
+      document.getElementById('temp-badge').innerText = tempBadgeText;
+      document.getElementById('temp-badge').className = `text-[10px] px-1.5 py-0.5 rounded border ${tempBadgeClass}`;
+      document.getElementById('temp-hr-offset').innerText = `+${tempHrOffset} bpm`;
+      document.getElementById('temp-hydration').innerText = `${hydrationMl} ml/hr`;
+      document.getElementById('temp-pace-decay').innerText = `+${tempPaceDecaySec} s/km`;
+
+      // 依當前模式更新數值與教練會診
+      let lugerStatus = "🟢 安全有氧";
+      let lugerClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 badge-glow-green";
+      let lugerComment = "";
+      let lugerHrTarget = "";
+      let lugerZone2Ratio = "90%";
+
+      let paceStatus = "🎯 目標鎖定";
+      let paceClass = "bg-blue-500/20 text-blue-300 border-blue-500/40";
+      let paceComment = "";
+      let paceTrimp = 110;
+      let paceCadence = "184 spm";
+
+      let matchedShoe = SHOE_VAULT.interval;
+
+      if (currentMode === 'interval') {
+        matchedShoe = SHOE_VAULT.interval;
+        const paceSec = parseInt(document.getElementById('interval-pace').value);
+        const reps = parseInt(document.getElementById('interval-reps').value);
+        const restSec = parseInt(document.getElementById('interval-rest').value);
+
+        document.getElementById('interval-pace-display').innerText = `${formatPace(paceSec)} /km`;
+        document.getElementById('interval-reps-display').innerText = `${reps} 組`;
+        document.getElementById('interval-rest-display').innerText = `${restSec} 秒`;
+        
+        // 800m 亞索預估時間
+        const single800Time = Math.round(paceSec * 0.8);
+        document.getElementById('interval-single-time').innerText = `${Math.floor(single800Time/60)}分${single800Time%60}秒`;
+
+        const effectiveHR = 186 + tempHrOffset;
+        lugerHrTarget = `${effectiveHR - 4} - ${effectiveHR + 4} bpm`;
+        lugerZone2Ratio = "25%";
+        paceCadence = "190-194 spm";
+        paceTrimp = Math.round(reps * 18 * (1 + tempHrOffset * 0.02));
+
+        if (paceSec < 210) { // 快於 3:30
+          lugerStatus = "🔴 逼近極限心率";
+          lugerClass = "bg-rose-500/20 text-rose-300 border-rose-500/40 badge-glow-red";
+          lugerComment = `警告！此配速預估心率將觸及 ${effectiveHR} bpm，乳酸將迅速累積。若後段步頻跌落 185，請立即終止課表。`;
+        } else {
+          lugerStatus = "🟡 閾值心肺刺激";
+          lugerClass = "bg-amber-500/20 text-amber-300 border-amber-500/40 badge-glow-yellow";
+          lugerComment = `亞索 800m 刺激強效，注意動態恢復時間保持慢跑踏步，心率回落至 145 bpm 再進入下一組。`;
+        }
+        paceComment = `單趟目標 ${Math.floor(single800Time/60)}分${single800Time%60}秒，推進腳踝剛性，前腳掌著地時間縮短在 210ms 以內！`;
+
+      } else if (currentMode === 'tempo') {
+        matchedShoe = SHOE_VAULT.tempo;
+        const paceSec = parseInt(document.getElementById('tempo-pace').value);
+        const distKm = parseInt(document.getElementById('tempo-dist').value);
+
+        document.getElementById('tempo-pace-display').innerText = `${formatPace(paceSec)} /km`;
+        document.getElementById('tempo-dist-display').innerText = `${distKm}.0 km`;
+        
+        const totalSec = paceSec * distKm;
+        document.getElementById('tempo-total-time').innerText = formatTime(totalSec);
+
+        const tempoHR = 174 + tempHrOffset;
+        lugerHrTarget = `${tempoHR - 3} - ${tempoHR + 5} bpm`;
+        lugerZone2Ratio = "15%";
+        paceCadence = "184-188 spm";
+        paceTrimp = Math.round(distKm * 12.5 * (1 + tempHrOffset * 0.02));
+
+        if (tempoHR > BASELINE.lthr) {
+          lugerStatus = `🔴 跨越乳酸閾值 (LTHR ${BASELINE.lthr})`;
+          lugerClass = "bg-rose-500/20 text-rose-300 border-rose-500/40 badge-glow-red";
+          lugerComment = `配速過激！心率將破 ${BASELINE.lthr} bpm LTHR 防線，將引發提前撞牆！佩絲建議退回 4:55/km。`;
+        } else {
+          lugerStatus = "🟢 乳酸清除平衡區 (Zone 4)";
+          lugerClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 badge-glow-green";
+          lugerComment = `維持在 LTHR (${BASELINE.lthr} bpm) 下方 5-10 bpm，有效擴大乳酸耐受池與排酸供能效率。`;
+        }
+        paceComment = `保持節奏定速巡航，第 5 公里後啟動臀中肌維持步幅，抗疲勞衰退！`;
+
+      } else if (currentMode === 'lsd') {
+        matchedShoe = SHOE_VAULT.lsd;
+        const paceSec = parseInt(document.getElementById('lsd-pace').value);
+        const distKm = parseInt(document.getElementById('lsd-dist').value);
+
+        document.getElementById('lsd-pace-display').innerText = `${formatPace(paceSec)} /km`;
+        document.getElementById('lsd-dist-display').innerText = `${distKm}.0 km`;
+
+        const totalSec = paceSec * distKm;
+        document.getElementById('lsd-total-time').innerText = formatTime(totalSec);
+
+        // 1. 基底心率估算 (依據配速相對於 Zone 2 標準有氧巡航 6:30/km)
+        // 6:30/km (390s) 為 Edward 標準 Zone 2 甜蜜點 (~151 bpm)
+        // 每快 15 秒/km，心率約攀升 +4 bpm；每慢 15 秒/km，心率約回落 -3 bpm
+        const baseRefPaceSec = 390; // 6:30/km
+        const paceDeltaSec = baseRefPaceSec - paceSec; // 正值 = 比 6:30 快
+        const z2MidHR = Math.round((BASELINE.z2_min + BASELINE.z2_max) / 2);
+        const startHR = Math.round(z2MidHR + (paceDeltaSec / 15) * 4);
+
+        // 2. 心率漂移計算 (後程脫水 + 肌肉微損傷 + 氣溫熱負荷)
+        const driftBpm = Math.max(0, Math.round((distKm / 10) * 3.5 + tempHrOffset));
+        const endHR = startHR + driftBpm;
+
+        lugerHrTarget = `${startHR} -> ${endHR} bpm`;
+        paceCadence = paceSec < 360 ? "182-186 spm" : "178-182 spm";
+        const intensityFactor = Math.max(0.7, startHR / BASELINE.lthr);
+        paceTrimp = Math.round(distKm * (7.5 * intensityFactor) * (1 + tempHrOffset * 0.02));
+
+        if (startHR > BASELINE.z2_max) {
+          // 狀態 1: 🔴 配速過快，起跑即破區 (例如 5:00/km)
+          lugerStatus = `🔴 嚴重超速！脫離 Zone 2 有氧`;
+          lugerClass = "bg-rose-500/20 text-rose-300 border-rose-500/40 badge-glow-red";
+          lugerComment = `警告！巡航配速 ${formatPace(paceSec)}/km 過快，開跑即達 ${startHR} bpm（突破 Zone 2 天花板 ${BASELINE.z2_max} bpm），徹底失去長跑燃脂與微血管增生效益！路格勒令退回 6:20/km 以上。`;
+          lugerZone2Ratio = "10%";
+          paceStatus = "⚠️ 步態負荷過重";
+          paceClass = "bg-rose-500/20 text-rose-300 border-rose-500/40";
+          paceComment = `配速過激導致下肢肌群提早僵硬，請放慢步幅，轉為以 180 spm 省力小步滾動！`;
+
+        } else if (endHR > BASELINE.z2_max) {
+          // 狀態 2: 🟡 起跑合規，但後程因長距離或高溫漂移出區
+          lugerStatus = `🟡 後程心率漂移出 Zone 2 (${BASELINE.z2_max} bpm)`;
+          lugerClass = "bg-amber-500/20 text-amber-300 border-amber-500/40 badge-glow-yellow";
+          lugerComment = `起跑配速 (${startHR} bpm) 合理，但 ${distKm}km 距離加上氣溫造成後程漂移高達 +${driftBpm} bpm（終點衝上 ${endHR} bpm）！請每 2.5km 補水 150ml + 補電解質，或後半程主動降速守住 Zone 2！`;
+          const z2Pct = Math.max(50, Math.round(95 - ((endHR - BASELINE.z2_max) * 3)));
+          lugerZone2Ratio = `${z2Pct}%`;
+          paceStatus = "💧 補給抗衰退警報";
+          paceClass = "bg-amber-500/20 text-amber-300 border-amber-500/40";
+          paceComment = `後程心臟每跳輸出量 (Stroke Volume) 下降，需靠補水與核心支撐穩定骨盆，避免垂直振幅發散。`;
+
+        } else if (endHR < BASELINE.z2_min) {
+          // 狀態 3: ☕ 低強度動態恢復 (Zone 1)
+          lugerStatus = "☕ 輕鬆動態恢復 (Zone 1 排酸)";
+          lugerClass = "bg-sky-500/20 text-sky-300 border-sky-500/40";
+          lugerComment = `強度極低（心率 ${startHR} -> ${endHR} bpm），屬於深層排酸與神經修復區。對心肺刺激較小，極度省力無負擔。`;
+          lugerZone2Ratio = "30%";
+          paceStatus = "🧘 慢活巡弋";
+          paceClass = "bg-sky-500/20 text-sky-300 border-sky-500/40";
+          paceComment = `步態放鬆自然，著重在腳掌平順著地，享受超長距離的放鬆律動。`;
+
+        } else {
+          // 狀態 4: 🟢 全程神聖 Zone 2 守衛成功
+          lugerStatus = "🟢 神聖 Zone 2 守衛成功";
+          lugerClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 badge-glow-green";
+          lugerComment = `完美有氧基底課！全區間穩穩鎖在 ${startHR} -> ${endHR} bpm（完全處於 ${BASELINE.z2_min}-${BASELINE.z2_max} 燃脂區），粒線體與微血管網效益最大化！`;
+          lugerZone2Ratio = "95%";
+          paceStatus = "🎯 有氧動能巡航";
+          paceClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+          paceComment = `經濟性極佳！維持步頻 182-184 spm，以超低耗能巡航完成 ${distKm} 公里長征。`;
+        }
+
+      } else if (currentMode === 'race') {
+        if (currentRaceDist <= 5) matchedShoe = SHOE_VAULT.race_5k;
+        else if (currentRaceDist <= 21.1) matchedShoe = SHOE_VAULT.race_half;
+        else matchedShoe = SHOE_VAULT.race_full;
+
+        const targetMin = parseFloat(document.getElementById('race-target-slider').value);
+        const rawTargetSec = targetMin * 60;
+        document.getElementById('race-target-time-display').innerText = formatTime(rawTargetSec);
+
+        // 氣溫熱補償：高溫下每公里折損 tempPaceDecaySec
+        const avgPaceSec = Math.round(rawTargetSec / currentRaceDist) + tempPaceDecaySec;
+        const decayTag = tempPaceDecaySec > 0 ? ` (+${tempPaceDecaySec}s 熱補償)` : "";
+        document.getElementById('race-calc-pace').innerHTML = `<span class="text-amber-300 font-bold">${formatPace(avgPaceSec)} /km</span><span class="text-[11px] text-amber-400/80 ml-1 font-normal">${decayTag}</span>`;
+
+        // 依據 Peter Riegel 跑力推算 VDOT
+        const speedMpm = (currentRaceDist * 1000) / (rawTargetSec / 60);
+        const approxVdot = Math.round((speedMpm * 0.2 + 10) * 10) / 10;
+        document.getElementById('race-vdot-val').innerText = `${approxVdot}`;
+
+        // Edward 台北馬真實歷史實績基準：
+        // 全馬 42.195K 基準：2024.12 台北馬 4:32:57 (約 271 分鐘，4:31:00)
+        // 半馬 21.0975K 基準：2025.12 台北馬 1:52:33 (112.55 分鐘)
+        let baselineSec = 0;
+        let baselineLabel = "";
+        if (currentRaceDist >= 40) {
+          baselineSec = 271 * 60; // 4:31:00
+          baselineLabel = "全馬 4:31:00";
+        } else if (currentRaceDist >= 20) {
+          baselineSec = 112.55 * 60; // 1:52:33
+          baselineLabel = "半馬 1:52:33";
+        } else if (currentRaceDist >= 9) {
+          baselineSec = 51 * 60; // 10K 51:00
+          baselineLabel = "10K 51:00";
+        } else {
+          baselineSec = 24.5 * 60; // 5K 24:30
+          baselineLabel = "5K 24:30";
+        }
+
+        // 跑力差距百分比 (考慮高溫折損後的實質等效挑戰度)
+        // 若在熱天堅持推原目標，心血管負荷相當於常溫下更快跑速
+        const equivalentSec = Math.max(1, rawTargetSec - (tempPaceDecaySec * currentRaceDist));
+        const perfDeltaPct = ((baselineSec - equivalentSec) / baselineSec) * 100;
+
+        // 計算加上溫度熱漂移後的實際預估心率
+        let hrBaseMin = 0, hrBaseMax = 0;
+        if (perfDeltaPct > 12.0) {
+          hrBaseMin = BASELINE.lthr + 2; hrBaseMax = BASELINE.maxHR;
+        } else if (perfDeltaPct > 3.5) {
+          hrBaseMin = Math.round(BASELINE.lthr - 8); hrBaseMax = BASELINE.lthr;
+        } else if (perfDeltaPct >= -3.5) {
+          hrBaseMin = BASELINE.z2_max; hrBaseMax = Math.round(BASELINE.lthr - 8);
+        } else if (perfDeltaPct >= -12.0) {
+          hrBaseMin = BASELINE.z2_min; hrBaseMax = BASELINE.z2_max + 3;
+        } else {
+          hrBaseMin = BASELINE.restHR + 70; hrBaseMax = BASELINE.z2_min + 5;
+        }
+
+        const estHrMin = hrBaseMin + tempHrOffset;
+        const estHrMax = Math.min(BASELINE.maxHR, hrBaseMax + tempHrOffset);
+        lugerHrTarget = `${estHrMin} - ${estHrMax} bpm`;
+
+        if (perfDeltaPct > 12.0 || estHrMax >= BASELINE.lthr + 4) {
+          // Tier 1: 💀 生理超載 / 爆缸警戒
+          lugerStatus = "💀 生理超載 (爆缸風險 98%)";
+          lugerClass = "bg-purple-900/40 text-purple-200 border-purple-500/50 badge-glow-red";
+          const heatMsg = tempHrOffset > 0 ? `受 ${tempC}°C 高溫影響，心率熱漂移高達 +${tempHrOffset} bpm！` : "";
+          lugerComment = `嚴重冒進！目標配速遠超目前心肺極限 (需 VDOT ${approxVdot})。${heatMsg}預估心率將觸及 ${estHrMax} bpm 衝破極限，必定嚴重積酸抽筋棄賽！路格勒令下修目標。`;
+          lugerZone2Ratio = "0%";
+
+          paceStatus = "⚠️ 力學崩潰警戒";
+          paceClass = "bg-purple-900/40 text-purple-200 border-purple-500/50";
+          paceComment = `神經肌肉無法支撐此步頻與觸地衝擊，垂直振幅將急速惡化失控，受傷風險極高！`;
+          paceCadence = "192-198 spm";
+          paceTrimp = Math.round(targetMin * 2.1 * (1 + tempHrOffset * 0.02));
+
+        } else if (perfDeltaPct > 3.5 || estHrMax >= BASELINE.lthr) {
+          // Tier 2: 🔥 高張激進挑戰 (超前或因高溫逼近乳酸閾值)
+          lugerStatus = tempHrOffset >= 6 ? `🔥 高溫熱負荷警戒 (心率破 ${BASELINE.lthr})` : "🔥 極限競賽 (Zone 4 閾值高壓)";
+          lugerClass = "bg-rose-500/20 text-rose-300 border-rose-500/40 badge-glow-red";
+          const heatWarn = tempHrOffset >= 6 
+            ? `當前氣溫 ${tempC}°C 帶來 +${tempHrOffset} bpm 心率熱漂移，強烈推動心肌負擔！若堅持原定目標配速，後半程心率將衝破 LTHR (${BASELINE.lthr} bpm)，必須嚴格啟動熱補償 (改以 ${formatPace(avgPaceSec)}/km 巡航) 並每 20 分鐘補水+鹽錠！`
+            : `高張激進挑戰！全程緊貼乳酸防線 (預估 ${estHrMin} - ${estHrMax} bpm)，容錯空間極小。必須嚴格每 30 分鐘補給 1 包高鈉能量膠，嚴防 30km 肝醣耗竭撞牆！`;
+          lugerComment = heatWarn;
+          lugerZone2Ratio = "10%";
+
+          paceStatus = "⚡ 頂級推進輸出";
+          paceClass = "bg-rose-500/20 text-rose-300 border-rose-500/40";
+          paceComment = `必須採用碳板競賽鞋，高步頻 (186-190 spm) 壓低觸地時間至 215ms，後程靠核心肌群死守配速！`;
+          paceCadence = "186-190 spm";
+          paceTrimp = Math.round(targetMin * 1.6 * (1 + tempHrOffset * 0.025));
+
+        } else if (perfDeltaPct >= -3.5) {
+          // Tier 3: 🟢 巔峰黃金甜蜜點
+          lugerStatus = tempHrOffset >= 8 ? `🟡 氣溫偏熱需補償` : "🟢 巔峰破 PB 甜蜜點";
+          lugerClass = tempHrOffset >= 8 ? "bg-amber-500/20 text-amber-300 border-amber-500/40 badge-glow-yellow" : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 badge-glow-green";
+          lugerComment = tempHrOffset >= 8
+            ? `基準實力匹配，但 ${tempC}°C 氣溫將使心率上浮至 ${estHrMin}-${estHrMax} bpm。佩絲建議手環啟動熱折損配速 (${formatPace(avgPaceSec)}/km)，確保後程體力穩定！`
+            : `黃金甜蜜點！精準匹配個人歷史實戰底蘊 (${baselineLabel})。心率可穩定控制在 Zone 3~4 交界，能量供能平衡，後半程具備強大加速反超潛力！`;
+          lugerZone2Ratio = "35%";
+
+          paceStatus = "🎯 巡航動能鎖定";
+          paceClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+          const strat = document.getElementById('race-pacing-strategy') ? document.getElementById('race-pacing-strategy').value : 'negative';
+          if (strat === 'negative') {
+            paceComment = `佩絲戰術：採用負分段 (Negative Split)。前半程放鬆蓄能，後半程開出碳板滾動推進力逐段反超，破 PB 成功率最高！`;
+          } else if (strat === 'even') {
+            paceComment = `佩絲戰術：採用等速巡航 (Even Pacing)。全程保持節奏如鐘，消除配速波動，能量代謝與攝氧量維持在最高效益曲線！`;
+          } else if (strat === 'parabolic') {
+            paceComment = `佩絲戰術：採用 U型巡航衝刺 (Parabolic)。中段定速蓄積儲備，最後 15% 解鎖神經中樞保護機制，全力點火終點大衝刺！`;
+          } else {
+            paceComment = `佩絲戰術：採用正分段防守 (Positive Split)。前半程趁體能飽滿搶出時間優勢，後半程頂風抗疲勞，以最小折損守住目標！`;
+          }
+          paceCadence = "184-188 spm";
+          paceTrimp = Math.round(targetMin * 1.3 * (1 + tempHrOffset * 0.02));
+
+        } else if (perfDeltaPct >= -12.0) {
+          // Tier 4: 🛡️ 穩健有氧完賽
+          lugerStatus = "🛡️ 穩健有氧完賽 (Zone 2/3)";
+          lugerClass = "bg-sky-500/20 text-sky-300 border-sky-500/40";
+          lugerComment = `保底巡航策略。即使在高溫下，心率仍大部分維持在安全有氧區 (${estHrMin}-${estHrMax} bpm)，乳酸堆積極低，幾乎零撞牆風險，能帶著微笑輕鬆穩健通過終點！`;
+          lugerZone2Ratio = "70%";
+
+          paceStatus = "🏃 省力經濟巡航";
+          paceClass = "bg-sky-500/20 text-sky-300 border-sky-500/40";
+          paceComment = `步頻維持 180-182 spm，利用身體自然前傾推進，省力經濟性極佳，適合作為減量期或備戰熱身賽。`;
+          paceCadence = "180-184 spm";
+          paceTrimp = Math.round(targetMin * 1.0 * (1 + tempHrOffset * 0.02));
+
+        } else {
+          // Tier 5: ☕ 觀光歡樂跑
+          lugerStatus = "☕ 觀光歡樂跑 (純 Zone 2 漫遊)";
+          lugerClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+          lugerComment = `輕鬆得像去河濱野餐！全程鎖定在純 Zone 2 深層燃脂區，代謝壓力極低，純純歡樂享受賽道風景與補給站美食！`;
+          lugerZone2Ratio = "92%";
+
+          paceStatus = "🧘 慢活巡弋";
+          paceClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+          paceComment = `不需要穿碳板戰靴，換上緩震慢跑鞋。邊跑邊和觀眾擊掌、吃補給站滷肉飯仙草冰毫無負擔！`;
+          paceCadence = "176-180 spm";
+          paceTrimp = Math.round(targetMin * 0.7);
+        }
+
+        // 即時重繪手環畫布
+        generateWristbandCanvas();
+      }
+
+      // 更新教練卡
+      document.getElementById('luger-status-badge').innerText = lugerStatus;
+      document.getElementById('luger-status-badge').className = `px-2 py-0.5 text-[11px] font-bold rounded-full border ${lugerClass}`;
+      document.getElementById('luger-comment').innerText = lugerComment;
+      document.getElementById('luger-hr-target').innerText = lugerHrTarget;
+      document.getElementById('luger-zone2-ratio').innerText = lugerZone2Ratio;
+
+      document.getElementById('pace-status-badge').innerText = paceStatus;
+      document.getElementById('pace-status-badge').className = `px-2 py-0.5 text-[11px] font-bold rounded-full border ${paceClass}`;
+      document.getElementById('pace-comment').innerText = paceComment;
+      document.getElementById('pace-trimp-val').innerText = paceTrimp;
+      document.getElementById('pace-target-cadence').innerText = paceCadence;
+
+
+    }
+
+    // ==========================================
+    // 繪製防水配速手環 Canvas (高解析度手環條)
+    // ==========================================
+    function generateWristbandCanvas(showFeedback = false) {
+      const canvas = document.getElementById('wristbandCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // 視覺反饋光暈與提示條
+      if (showFeedback) {
+        const alertBox = document.getElementById('wristband-alert');
+        const container = document.getElementById('canvas-container');
+        if (alertBox) {
+          alertBox.innerText = `✨ 已依據最新目標 (${document.getElementById('race-target-time-display').innerText}) 重新繪製配速手環！`;
+          alertBox.classList.remove('hidden');
+          setTimeout(() => alertBox.classList.add('hidden'), 3500);
+        }
+        if (container) {
+          container.style.borderColor = '#f59e0b';
+          container.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.6)';
+          setTimeout(() => {
+            container.style.borderColor = '#1e293b';
+            container.style.boxShadow = 'none';
+          }, 1200);
+        }
+      }
+
+      const targetMin = parseFloat(document.getElementById('race-target-slider').value);
+      const targetSec = targetMin * 60;
+      const dist = currentRaceDist;
+      const strategy = document.getElementById('race-pacing-strategy').value;
+
+      // 讀取當前氣溫折損與心率補償
+      const tempSliderEl = document.getElementById('temp-slider');
+      const tempC = tempSliderEl ? parseInt(tempSliderEl.value) : 18;
+      const decayEl = document.getElementById('temp-pace-decay');
+      const hrOffsetEl = document.getElementById('temp-hr-offset');
+      const tempPaceDecaySec = decayEl ? (parseInt(decayEl.innerText.replace(/[^\d]/g, '')) || 0) : 0;
+      const tempHrOffset = hrOffsetEl ? (parseInt(hrOffsetEl.innerText.replace(/[^\d]/g, '')) || 0) : 0;
+      const isHot = tempPaceDecaySec > 0;
+
+      // 目標均速與完賽時間：手環完賽時間必須 100% 嚴格等於目標時間 targetSec！
+      const basePaceSec = Math.round(targetSec / dist);
+
+      // 清空畫布
+      ctx.fillStyle = "#090d16";
+      ctx.fillRect(0, 0, w, h);
+
+      // 外框與金屬質感手環邊線
+      ctx.strokeStyle = isHot ? "#f59e0b" : "#3b82f6";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(3, 3, w - 6, h - 6);
+
+      // 手環標題條 (左側 270px)
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(6, 6, 268, h - 12);
+
+      // 跑者姓名與賽事名稱
+      const rName = BASELINE.runnerName || "跑者";
+      ctx.fillStyle = isHot ? "#fbbf24" : "#facc15";
+      ctx.font = "bold 21px sans-serif";
+      ctx.fillText(`${rName} • ${currentRaceName}`, 20, 46);
+
+      // 完賽時間 (嚴格與目標完賽時間一致)
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 32px monospace";
+      const totalH = Math.floor(targetSec / 3600);
+      const totalM = Math.floor((targetSec % 3600) / 60);
+      const totalS = Math.floor(targetSec % 60);
+      const timeStr = (totalH > 0)
+        ? `${totalH}:${totalM < 10 ? '0' : ''}${totalM}:${totalS < 10 ? '0' : ''}${totalS}`
+        : `${totalM}:${totalS < 10 ? '0' : ''}${totalS}`;
+      ctx.fillText(timeStr, 20, 94);
+
+      // 目標均速
+      ctx.fillStyle = isHot ? "#fbbf24" : "#38bdf8";
+      ctx.font = "bold 20px sans-serif";
+      ctx.fillText(`目標均速 ${formatPace(basePaceSec)}/km`, 20, 134);
+
+      // 依當前目標配速 (basePaceSec) 與運動生理學模型計算所需心率
+      // 基準閾值配速約 320 秒/公里 (5:20/km 對應 Edward LTHR 181 bpm)
+      const speedRatio = 320.0 / Math.max(150, basePaceSec);
+      const aerobicDemandHr = Math.round(BASELINE.restHR + (BASELINE.lthr - BASELINE.restHR) * Math.pow(speedRatio, 1.15));
+      const finishExpectedHr = Math.min(BASELINE.maxHR, Math.round(aerobicDemandHr + 8 + tempHrOffset));
+
+      let stripDefenseTitle = `LTHR ${BASELINE.lthr} bpm 防線`;
+      let stripDefenseColor = "#f43f5e";
+      if (finishExpectedHr >= BASELINE.lthr + 5) {
+        stripDefenseTitle = `Max HR ${BASELINE.maxHR} 爆缸警戒`;
+        stripDefenseColor = "#d946ef";
+      } else if (finishExpectedHr >= BASELINE.lthr) {
+        stripDefenseTitle = `LTHR ${BASELINE.lthr} bpm 閾值防線`;
+        stripDefenseColor = "#f43f5e";
+      } else if (finishExpectedHr >= BASELINE.z2_max + 4) {
+        stripDefenseTitle = `有氧節奏 ${BASELINE.z2_max + 4} bpm 巡航`;
+        stripDefenseColor = "#38bdf8";
+      } else {
+        stripDefenseTitle = `Zone 2 ${BASELINE.z2_max} bpm 守護`;
+        stripDefenseColor = "#10b981";
+      }
+
+      ctx.fillStyle = stripDefenseColor;
+      ctx.font = "bold 17px sans-serif";
+      ctx.fillText(stripDefenseTitle, 20, 172);
+
+      ctx.fillStyle = isHot ? "#fb923c" : "#94a3b8";
+      ctx.font = "15px sans-serif";
+      const bandSub = isHot ? `🌡️ ${tempC}°C 高溫戰略 (+${tempPaceDecaySec}s負荷)` : `${rName} 專屬戰略手環`;
+      ctx.fillText(bandSub, 20, 208);
+
+      // 分段 Checkpoints (5K, 10K, 15K, 20K, 25K, 30K, 35K, 40K, Finish)
+      let checkpoints = [];
+      if (dist <= 5) {
+        checkpoints = [1, 2, 3, 4, 5];
+      } else if (dist <= 10) {
+        checkpoints = [2, 4, 6, 8, 10];
+      } else if (dist <= 21.1) {
+        checkpoints = [5, 10, 15, 20, 21.0975];
+      } else {
+        checkpoints = [5, 10, 15, 20, 25, 30, 35, 40, 42.195];
+      }
+
+      const availableWidth = w - 280;
+      const colWidth = availableWidth / checkpoints.length;
+
+      checkpoints.forEach((cp, idx) => {
+        const colX = 276 + idx * colWidth;
+
+        // 格子背景交替
+        ctx.fillStyle = (idx % 2 === 0) ? "rgba(30, 41, 59, 0.45)" : "rgba(15, 23, 42, 0.75)";
+        ctx.fillRect(colX, 6, colWidth - 3, h - 12);
+
+        // 垂直分隔線
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(colX, 6);
+        ctx.lineTo(colX, h - 6);
+        ctx.stroke();
+
+        const isFinish = (idx === checkpoints.length - 1);
+
+        // 1. 公里標籤
+        ctx.fillStyle = "#facc15";
+        ctx.font = "bold 23px sans-serif";
+        const cpLabel = isFinish ? "FINISH" : `${cp}K`;
+        ctx.fillText(cpLabel, colX + 12, 44);
+
+        // 2. 運動科學 4 大策略之累積時間與單段配速計算 (FINISH 節點 100% 嚴格吻合 targetSec)
+        let cpSec = 0;
+        let segPace = basePaceSec;
+        const progress = Math.min(1.0, cp / dist);
+
+        if (isFinish) {
+          cpSec = Math.round(targetSec);
+          if (strategy === 'negative') {
+            segPace = Math.round(basePaceSec * 0.978); // 後段提速 2.2%
+          } else if (strategy === 'even') {
+            segPace = Math.round(basePaceSec);         // 恆定均速
+          } else if (strategy === 'parabolic') {
+            segPace = Math.round(basePaceSec * 0.935); // 終點全力大衝刺 -6.5%
+          } else if (strategy === 'positive') {
+            segPace = Math.round(basePaceSec * 1.025); // 後段抗疲勞防守 +2.5%
+          }
+        } else {
+          let cumFactor = 1.0;
+          let segFactor = 1.0;
+
+          if (strategy === 'negative') {
+            // 負分段：前半保留 1.8%，後半推進
+            cumFactor = 1.018 - (progress * 0.018);
+            segFactor = 1.018 - (progress * 0.036);
+          } else if (strategy === 'even') {
+            // 等速巡航：全程恆定
+            cumFactor = 1.0;
+            segFactor = 1.0;
+          } else if (strategy === 'parabolic') {
+            // U型巡航衝刺：前 80% 均速，最後 20% 激發
+            if (progress <= 0.8) {
+              cumFactor = 1.012;
+              segFactor = 1.010;
+            } else {
+              const sprintRatio = (progress - 0.8) / 0.2;
+              cumFactor = 1.012 - (sprintRatio * 0.012);
+              segFactor = 1.010 - (sprintRatio * 0.075);
+            }
+          } else if (strategy === 'positive') {
+            // 正分段防守：前段借充沛體能搶 -1.8%，後段抗衰 +1.8%
+            cumFactor = 0.982 + (progress * 0.018);
+            segFactor = 0.982 + (progress * 0.036);
+          }
+
+          cpSec = Math.round(targetSec * progress * cumFactor);
+          segPace = Math.round(basePaceSec * segFactor);
+        }
+
+        const cpH = Math.floor(cpSec / 3600);
+        const cpM = Math.floor((cpSec % 3600) / 60);
+        const cpS = Math.floor(cpSec % 60);
+        const cpTimeStr = (cpH > 0) 
+          ? `${cpH}:${cpM < 10 ? '0' : ''}${cpM}:${cpS < 10 ? '0' : ''}${cpS}`
+          : `${cpM}:${cpS < 10 ? '0' : ''}${cpS}`;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 26px monospace";
+        ctx.fillText(cpTimeStr, colX + 10, 90);
+
+        // 3. 單段目標配速
+        ctx.fillStyle = isHot ? "#fbbf24" : "#38bdf8";
+        ctx.font = "bold 20px monospace";
+        ctx.fillText(`${formatPace(segPace)}/k`, colX + 10, 130);
+
+        // 4. 💓 當下配速所需心率與賽段上限警戒
+        // 隨里程累進之自然心臟漂移與氣溫熱漂移
+        const segSpeedRatio = 320.0 / Math.max(150, segPace);
+        const segBaseHr = BASELINE.restHR + (BASELINE.lthr - BASELINE.restHR) * Math.pow(segSpeedRatio, 1.15);
+        const driftAccum = (progress * 7.5) + (progress * tempHrOffset);
+        const targetPaceHr = Math.min(BASELINE.maxHR, Math.round(segBaseHr + driftAccum));
+        const capHr = Math.min(BASELINE.maxHR, targetPaceHr + 4);
+
+        let hrTarget = `💓 ${targetPaceHr} (<${capHr})`;
+        let hrColor = "#10b981";
+        if (capHr > BASELINE.lthr + 4) {
+          hrTarget = `🔥 ${targetPaceHr} (<${capHr})`;
+          hrColor = "#f43f5e";
+        } else if (capHr > BASELINE.lthr) {
+          hrTarget = `⚡ ${targetPaceHr} (<${capHr})`;
+          hrColor = "#fb923c";
+        } else if (capHr > BASELINE.z2_max) {
+          hrTarget = `🎯 ${targetPaceHr} (<${capHr})`;
+          hrColor = "#fbbf24";
+        }
+        ctx.fillStyle = hrColor;
+        ctx.font = "bold 17px sans-serif";
+        ctx.fillText(hrTarget, colX + 8, 170);
+
+        // 5. 各時間點專屬戰術與補給注意要點 (Tactical Phase Guidance)
+        let supplyText = "👣 步頻184";
+        let supplyColor = "#64748b";
+        
+        if (progress <= 0.28) {
+          // 起跑 ~ 前 25% (如 5K / 10K)：嚴控壓制開機
+          supplyText = isHot ? "🛑壓制開機・補水" : "🛑壓制切忌爆衝";
+          supplyColor = "#38bdf8";
+        } else if (progress <= 0.52) {
+          // 前中段 (如 10K / 20K)：穩態巡航定速
+          supplyText = isHot ? "⚡第1膠+雙倍水" : "⚡第1膠+穩巡航";
+          supplyColor = "#ec4899";
+        } else if (progress <= 0.78) {
+          // 中後段 (如 15K / 30K)：抗漂移與抽筋預防
+          supplyText = isHot ? "💧抗熱漂移+鹽錠" : "💧補電解質+防漂";
+          supplyColor = "#06b6d4";
+        } else if (progress < 0.98) {
+          // 20K / 40K：耐乳酸死守配速
+          supplyText = isHot ? "⚡第2膠+死守配速" : "⚡第2膠+咬住配速";
+          supplyColor = "#f59e0b";
+        } else {
+          // FINISH (終點前)：意志燃盡衝刺
+          supplyText = "🏁燃盡終點衝刺！";
+          supplyColor = "#ef4444";
+        }
+        ctx.fillStyle = supplyColor;
+        ctx.font = "bold 15px sans-serif";
+        ctx.fillText(supplyText, colX + 6, 210);
+      });
+    }
+
+    // 下載手環圖檔
+    function downloadWristbandImage() {
+      const canvas = document.getElementById('wristbandCanvas');
+      if (!canvas) return;
+      try {
+        const dataUrl = canvas.toDataURL("image/png");
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `${BASELINE.runnerName || "Race"}_${currentRaceName}_配速手環.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // 提示下載完成
+        const alertBox = document.getElementById('wristband-alert');
+        if (alertBox) {
+          alertBox.innerText = `💾 手環圖檔 (${BASELINE.runnerName || "Race"}_${currentRaceName}_配速手環.png) 已成功下載！請至瀏覽器下載資料夾查看。`;
+          alertBox.classList.remove('hidden');
+          setTimeout(() => alertBox.classList.add('hidden'), 4000);
+        }
+      } catch (e) {
+        console.error("Download failed:", e);
+      }
+    }
+
+    // 事件監聽綁定
+    document.addEventListener('DOMContentLoaded', () => {
+      ['interval-pace', 'interval-reps', 'interval-rest', 'tempo-pace', 'tempo-dist', 'lsd-pace', 'lsd-dist', 'race-target-slider'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateSimulation);
+      });
+      updateSimulation();
+    });
+
+    // 立即初始化
+    updateSimulation();
+  </script>
+</body>
+</html>

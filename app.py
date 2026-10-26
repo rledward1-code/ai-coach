@@ -1836,9 +1836,16 @@ with tab_sim:
     st.markdown("### 🎛️ 雙教練配速模擬與賽事沙盤推演 (旗艦全能版)")
     st.caption("支援在畫面上切換「間歇跑」、「節奏跑」、「LSD」與「大賽推演」，整合天氣補償、4大科學配速策略與防水配速手環下載！")
     
-    html_card_path = "C:/Users/Edward/.gemini/antigravity/brain/0af66755-b010-43fb-835b-4354be4d4588/coach_dashboard_interactive.html"
+    html_card_path = "templates/coach_dashboard_interactive.html"
     if not os.path.exists(html_card_path):
-        html_card_path = ".agents/skills/running-coach-duo/templates/coach_dashboard_interactive.html"
+        for p in [
+            "assets/coach_dashboard_interactive.html",
+            ".agents/skills/running-coach-duo/templates/coach_dashboard_interactive.html",
+            "C:/Users/Edward/.gemini/antigravity/brain/0af66755-b010-43fb-835b-4354be4d4588/coach_dashboard_interactive.html"
+        ]:
+            if os.path.exists(p):
+                html_card_path = p
+                break
         
     if os.path.exists(html_card_path):
         with open(html_card_path, "r", encoding="utf-8") as hf:
