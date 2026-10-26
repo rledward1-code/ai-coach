@@ -443,6 +443,80 @@ def open_profile_dialog():
             help="基於隱私防護，系統不在畫面上回顯真實 Webhook 網址"
         )
 
+        with st.expander("📖 如何建立您專屬的 Google Apps Script Webhook？(點擊展開 3 步驟與範例代碼)", expanded=False):
+            st.markdown("""
+            **雙向回寫同步 Webhook** 能讓 Antigravity 雙教練或系統自動為您調整課表、寫入最新賽事實績至試算表。
+
+            **🛠️ 3 分鐘架設步驟：**
+            1. 打開您的 Google 試算表，點擊頂部選單 **「擴充功能」->「Apps Script」**。
+            2. 將編輯器內原有代碼清空，複製貼上下方的「標準 Webhook 腳本」。
+            3. 點擊右上角 **「部署」->「新部署作業」**：
+               * 點選齒輪圖示，選取 **「網頁應用程式 (Web app)」**。
+               * 說明：`AI Coach Webhook`
+               * 執行身分：**我 (您的 Google 帳號)**
+               * 誰可以存取：**所有人 (Anyone)** *(確保雲端能向端點 POST 課表與成績)*
+            4. 點擊 **「部署」** 並同意存取授權，複製產生的 **「網頁應用程式網址」** (以 `/exec` 結尾) 並貼回上方欄位！
+            """)
+            gas_sample_code = """/**
+ * AI Coach Google Apps Script Webhook 輕量範本
+ * 支援功能：
+ * 1. 課表指定儲存格微調 (update_cell)
+ * 2. 多列多欄課表批次同步 (set_range)
+ * 3. 賽事實績自動追加 (appendRow)
+ */
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "ok",
+    message: "AI Coach 跑步賽事與課表智能同步端點正常運作中！"
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.tryLock(10000);
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "缺少內容" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(data.sheet_name || "成績") || ss.getActiveSheet();
+    var action = data.action || "";
+
+    // 1. 單一儲存格更新 (如教練微調某日配速)
+    if (action === "update_cell") {
+      sheet.getRange(data.cell).setValue(data.value);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", cell: data.cell, value: data.value }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2. 多列多欄批次寫入 (如同步整週最新課表)
+    if (action === "set_range" && data.values) {
+      sheet.getRange(data.start_row || 1, data.start_col || 1, data.values.length, data.values[0].length).setValues(data.values);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", rows: data.values.length }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. 賽事實績追加寫入
+    if (data.row) {
+      sheet.appendRow(data.row);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "賽事已追加！" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "ok" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}"""
+            st.code(gas_sample_code, language="javascript")
+            st.caption("💡 完整版高階代碼（支援半馬/全馬分區插行與歷史刪除）請參閱專案根目錄的 `google_apps_script.js`。")
+
         c_g_save, c_g_test = st.columns(2)
         with c_g_save:
             if st.button("💾 儲存試算表設定", use_container_width=True):
