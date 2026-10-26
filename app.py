@@ -380,12 +380,25 @@ def open_profile_dialog():
             您的 Garmin API Token <strong>僅保存在本機檔案中 (Local Storage)</strong>，絕不上傳任何第三方雲端或外部伺服器。所有連線均由您的瀏覽器/電腦直接向 Garmin 官方伺服器 (<code>connectapi.garmin.com</code>) 發起請求，隱私 100% 自主掌控。
         </div>
         """, unsafe_allow_html=True)
-        cur_k = garmin_cloud.get_personal_api_key()
-        in_api_k = st.text_input("Garmin Personal API Token", value=cur_k, type="password", placeholder="GCDC_xxxxxxxx-xxxx...")
-        if st.button("💾 驗證並儲存 Garmin Token 至本機", use_container_width=True):
-            if in_api_k:
+        has_token = garmin_cloud.has_valid_token()
+        if has_token:
+            st.success("🔒 **系統狀態：已綁定有效 Garmin Token (安全隱藏保護)**")
+            token_placeholder = "已配置金鑰。若需更換請在此輸入新 Token"
+        else:
+            st.info("ℹ️ **系統狀態：尚未配置 Token (可在此輸入金鑰直接啟用)**")
+            token_placeholder = "GCDC_xxxxxxxx-xxxx..."
+
+        in_api_k = st.text_input(
+            "Garmin Personal API Token",
+            value="",
+            type="password",
+            placeholder=token_placeholder,
+            help="基於最高安全防護原則，系統絕不在畫面上回顯真實 Token 字串，防止瀏覽器檢查外洩"
+        )
+        if st.button("💾 驗證並儲存 Garmin Token", use_container_width=True):
+            if in_api_k and in_api_k.strip():
                 with st.spinner("向 Garmin 官方伺服器驗證中..."):
-                    ok, vmsg = garmin_cloud.save_personal_api_key(in_api_k)
+                    ok, vmsg = garmin_cloud.save_personal_api_key(in_api_k.strip())
                     if ok:
                         st.session_state.cloud_activities = []
                         st.success(vmsg)
@@ -393,7 +406,7 @@ def open_profile_dialog():
                     else:
                         st.error(vmsg)
             else:
-                st.warning("請輸入 API Token")
+                st.warning("請輸入欲更新的 API Token")
 
     with t_gsheet:
         cur_sheet_url, cur_csv_url = get_gsheet_urls()
@@ -419,30 +432,38 @@ def open_profile_dialog():
             help="開啟 Google 試算表後，直接複製瀏覽器網址列整串網址貼入即可"
         )
         
+        has_webhook = bool(cur_webhook)
+        wh_placeholder = "🔒 已配置專屬 Webhook。若需更換請輸入新網址" if has_webhook else "https://script.google.com/macros/s/.../exec"
+
         in_webhook_url = st.text_input(
             "Google Apps Script Webhook 網址 (選填，用於雙向回寫同步)",
-            value=cur_webhook,
-            placeholder="https://script.google.com/macros/s/.../exec",
-            help="用於透過雙教練動態微調後自動回寫試算表"
+            value="",
+            type="password",
+            placeholder=wh_placeholder,
+            help="基於隱私防護，系統不在畫面上回顯真實 Webhook 網址"
         )
 
         c_g_save, c_g_test = st.columns(2)
         with c_g_save:
             if st.button("💾 儲存試算表設定", use_container_width=True):
-                if in_sheet_url:
-                    save_gsheet_settings(in_sheet_url.strip(), in_webhook_url.strip())
+                target_sheet = in_sheet_url.strip() if in_sheet_url else cur_sheet_url
+                target_wh = in_webhook_url.strip() if in_webhook_url else cur_webhook
+                if target_sheet:
+                    save_gsheet_settings(target_sheet, target_wh)
                     st.cache_data.clear()
                     st.success("✅ 試算表設定已儲存！")
                     st.rerun()
                 else:
-                    save_gsheet_settings("", in_webhook_url.strip())
+                    save_gsheet_settings("", target_wh)
                     st.info("已清空自訂試算表，系統恢復為本地安全課表。")
                     st.rerun()
                     
         with c_g_test:
             if st.button("🧪 測試連線並同步課表", use_container_width=True):
-                if in_sheet_url:
-                    save_gsheet_settings(in_sheet_url.strip(), in_webhook_url.strip())
+                target_sheet = in_sheet_url.strip() if in_sheet_url else cur_sheet_url
+                target_wh = in_webhook_url.strip() if in_webhook_url else cur_webhook
+                if target_sheet:
+                    save_gsheet_settings(target_sheet, target_wh)
                     with st.spinner("連線 Google 試算表中..."):
                         test_sched = load_schedule_data(force_reload=True)
                         if test_sched:
