@@ -10,7 +10,7 @@
 | :--- | :--- | :--- |
 | **`parse_activity`** | `file_path`: 本地 `.fit` 或 `.csv` 路徑 | 自動提取總距離、平均配速、心率區間分佈 (Zone 1~5)、Lap 明細、觸地時間 (GCT)、垂直振幅與步態剛性。 |
 | **`simulate_training_plan`** | `target_pace`, `intervals_count`, `interval_distance_m`, `rest_seconds`, `current_rpe`, `weekly_mileage_km` | 模擬間歇課表負荷，推演 TRIMP 負荷指數、心率漂移曲線，並輸出路格 (Luger) 紅綠燈評定與佩絲 (Pace) 恢復處方。 |
-| **`get_edward_runner_profile`** | 無 | 讀取跑者個人生理特質、乳酸閾值 (LTHR)、Zone 2 守護線與裝備清單。 |
+| **`get_runner_profile`** | 無 | 讀取跑者個人生理特質、乳酸閾值 (LTHR)、Zone 2 守護線與裝備清單 (相容 `get_edward_runner_profile`)。 |
 | **`search_race_vault`** | `query`: 賽事關鍵字 (如 "台北馬", "長榮") | 檢索歷年重大賽事實績資料庫與訓練營課表。 |
 | **`sync_latest_garmin_activity`** | `folder_override`: 自訂目錄 (選填) | 自動掃描 USB 連接的 Garmin 手錶目錄或本地同步資料夾，提取最新一次實跑檔案並輸出摘要。 |
 

@@ -19,8 +19,22 @@ def setup():
     if not os.path.exists(desktop_dir):
         desktop_dir = os.path.expandvars(r"%USERPROFILE%\Desktop")
 
-    workspace = r"d:\ai-coach"
-    pythonw = os.path.join(workspace, "venv_EDWARD-ALIENWAR", "Scripts", "pythonw.exe")
+    workspace = os.path.dirname(os.path.abspath(__file__))
+    pythonw = sys.executable.replace("python.exe", "pythonw.exe")
+    for _cand in [
+        os.path.join(workspace, ".venv", "Scripts", "pythonw.exe"),
+        os.path.join(workspace, "venv", "Scripts", "pythonw.exe"),
+    ]:
+        if os.path.exists(_cand):
+            pythonw = _cand
+            break
+    else:
+        for _e in os.listdir(workspace):
+            if _e.startswith("venv") and os.path.isdir(os.path.join(workspace, _e)):
+                _cand = os.path.join(workspace, _e, "Scripts", "pythonw.exe")
+                if os.path.exists(_cand):
+                    pythonw = _cand
+                    break
     launcher = os.path.join(workspace, "launcher.py")
 
     targets = [

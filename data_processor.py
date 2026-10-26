@@ -287,16 +287,19 @@ def _apply_standard_processing(df, session_data):
     def get_hr_zone(hr):
         if not pd.notna(hr) or hr <= 0: return ""
         
-        # --- 針對 Edward (210/53-56) 的路格專屬精確校準 ---
-        if user_max_hr == 210:
-            if hr < 132: return ""
-            elif hr < 148: return "(Zone 1)" # 132-147
-            elif hr < 164: return "(Zone 2)" # 148-163
-            elif hr < 180: return "(Zone 3)" # 164-179
-            elif hr < 195: return "(Zone 4)" # 180-194
-            else: return "(Zone 5)"         # 195-210
+        # --- 依據用戶自訂生理分區或標準儲備心率 (HRR) 計算 ---
+        z2_min = u_profile.get("z2_min") if 'u_profile' in locals() and u_profile else None
+        z2_max = u_profile.get("z2_max") if 'u_profile' in locals() and u_profile else None
+        lthr = u_profile.get("lthr") if 'u_profile' in locals() and u_profile else None
         
-        # --- 其他用戶的通用 HRR 邏輯 ---
+        if z2_min and z2_max:
+            if hr < z2_min: return "(Zone 1)"
+            elif hr <= z2_max: return "(Zone 2)"
+            elif lthr and hr <= lthr: return "(Zone 3)"
+            elif lthr and hr < user_max_hr: return "(Zone 4)"
+            else: return "(Zone 5)"
+        
+        # 通用 HRR (Karvonen) 邏輯
         hrr_total = user_max_hr - user_rest_hr
         if hrr_total <= 0: return ""
         pct_hrr = (hr - user_rest_hr) / hrr_total

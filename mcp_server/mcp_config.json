@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "ai-coach": {
-      "command": "d:\\ai-coach\\venv_EDWARD-ALIENWAR\\Scripts\\python.exe",
+      "command": "python",
       "args": [
-        "d:\\ai-coach\\mcp_server\\server.py"
+        "mcp_server/server.py"
       ],
       "env": {
         "PYTHONIOENCODING": "utf-8"

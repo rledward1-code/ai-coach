@@ -35,6 +35,8 @@ Thumbs.db
 .vscode/
 .idea/
 
-# 6. 私人生理數據與健康手冊 (僅保留於本地供 Antigravity 雙教練使用)
+# 6. 私人生理數據與個人頭像 (僅保留於本地)
 *edward_physiology*
 .agents/**/edward_physiology.md
+assets/Edward.png
+assets/edward.png

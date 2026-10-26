@@ -28,7 +28,7 @@
           <span class="text-2xl">🏃‍♂️</span>
           <h2 class="text-lg font-bold tracking-tight text-white">AI Coach 運動科學戰情微調模擬器</h2>
         </div>
-        <p class="text-xs text-slate-300 mt-0.5">跑者：個人 | Max HR 210 | Rest HR 53 | LTHR 193 | Zone 2: 148-163 bpm</p>
+        <p class="text-xs text-slate-300 mt-0.5">跑者：跑者 | Max HR 190 | Rest HR 58 | LTHR 172 | Zone 2: 138-154 bpm</p>
       </div>
 
       <!-- 四大訓練/賽事模式 Tab -->
@@ -270,17 +270,17 @@
   </div>
 
   <script>
-    // Edward 生理基準
+    // 跑者預設生理基準
     const BASELINE = {
       runnerName: "跑者",
-      maxHR: 210,
-      restHR: 53,
-      lthr: 193,
-      z2_min: 148,
-      z2_max: 163,
-      vdot_base: 35.0,
-      marathon_time_min: 271, // 4:31:00 (2024 台北馬全馬 PB)
-      half_marathon_time_min: 112.55 // 1:52:33 (2025 台北馬半馬 PB)
+      maxHR: 190,
+      restHR: 58,
+      lthr: 172,
+      z2_min: 138,
+      z2_max: 154,
+      vdot_base: 38.0,
+      marathon_time_min: 255, // 4:15:00
+      half_marathon_time_min: 118 // 1:58:00
     };
 
     let currentMode = 'interval';
@@ -288,7 +288,7 @@
     let currentRaceName = '全程馬拉松';
     let currentRaceTargetMin = 271;
 
-    // 鞋櫃資料庫 (擷取自 Edward 知識庫跑鞋清單)
+    // 跑鞋資料庫
     const SHOE_VAULT = {
       interval: {
         name: "Nike Vaporfly 4 / Zoom Fly 6",
@@ -539,7 +539,7 @@
         document.getElementById('lsd-total-time').innerText = formatTime(totalSec);
 
         // 1. 基底心率估算 (依據配速相對於 Zone 2 標準有氧巡航 6:30/km)
-        // 6:30/km (390s) 為 Edward 標準 Zone 2 甜蜜點 (~151 bpm)
+        // 6:30/km (390s) 為標準 Zone 2 有氧巡航配速
         // 每快 15 秒/km，心率約攀升 +4 bpm；每慢 15 秒/km，心率約回落 -3 bpm
         const baseRefPaceSec = 390; // 6:30/km
         const paceDeltaSec = baseRefPaceSec - paceSec; // 正值 = 比 6:30 快
@@ -616,7 +616,7 @@
         const approxVdot = Math.round((speedMpm * 0.2 + 10) * 10) / 10;
         document.getElementById('race-vdot-val').innerText = `${approxVdot}`;
 
-        // Edward 台北馬真實歷史實績基準：
+        // 歷史實績推演基準：
         // 全馬 42.195K 基準：2024.12 台北馬 4:32:57 (約 271 分鐘，4:31:00)
         // 半馬 21.0975K 基準：2025.12 台北馬 1:52:33 (112.55 分鐘)
         let baselineSec = 0;
@@ -841,7 +841,7 @@
       ctx.fillText(`目標均速 ${formatPace(basePaceSec)}/km`, 20, 134);
 
       // 依當前目標配速 (basePaceSec) 與運動生理學模型計算所需心率
-      // 基準閾值配速約 320 秒/公里 (5:20/km 對應 Edward LTHR 181 bpm)
+      // 基準閾值配速約 320 秒/公里 (5:20/km 對應 LTHR 閾值心率)
       const speedRatio = 320.0 / Math.max(150, basePaceSec);
       const aerobicDemandHr = Math.round(BASELINE.restHR + (BASELINE.lthr - BASELINE.restHR) * Math.pow(speedRatio, 1.15));
       const finishExpectedHr = Math.min(BASELINE.maxHR, Math.round(aerobicDemandHr + 8 + tempHrOffset));

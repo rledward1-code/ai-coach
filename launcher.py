@@ -17,7 +17,21 @@ import subprocess
 
 URL = "http://localhost:8501"
 WORKSPACE_DIR = os.path.dirname(os.path.abspath(__file__))
-PYTHON_EXE = os.path.join(WORKSPACE_DIR, "venv_EDWARD-ALIENWAR", "Scripts", "python.exe")
+PYTHON_EXE = sys.executable
+for _cand in [
+    os.path.join(WORKSPACE_DIR, ".venv", "Scripts", "python.exe"),
+    os.path.join(WORKSPACE_DIR, "venv", "Scripts", "python.exe"),
+]:
+    if os.path.exists(_cand):
+        PYTHON_EXE = _cand
+        break
+else:
+    for _e in os.listdir(WORKSPACE_DIR):
+        if _e.startswith("venv") and os.path.isdir(os.path.join(WORKSPACE_DIR, _e)):
+            _cand = os.path.join(WORKSPACE_DIR, _e, "Scripts", "python.exe")
+            if os.path.exists(_cand):
+                PYTHON_EXE = _cand
+                break
 
 def is_running():
     try:

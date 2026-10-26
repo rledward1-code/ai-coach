@@ -478,7 +478,8 @@ def render_compare_tab():
     if not has_hr_a and not has_hr_b:
         fig_sync.add_annotation(text="兩場賽事皆無逐圈心率記錄 (可能為手動計時或無心率帶)", row=2, col=1, showarrow=False, font=dict(color="#94a3b8", size=13))
     else:
-        fig_sync.add_hline(y=181, line_dash="dash", line_color="#fbbf24", annotation_text="Edward LTHR (181 bpm)", row=2, col=1)
+        user_lthr = st.session_state.get('active_lthr', 172)
+        fig_sync.add_hline(y=user_lthr, line_dash="dash", line_color="#fbbf24", annotation_text=f"乳酸閾值 LTHR ({user_lthr} bpm)", row=2, col=1)
 
     # 3. 跑姿動力學 GCT & 步頻 (Row 3) - 全面容錯
     has_gct_a = 'gct' in df_a_clip.columns and df_a_clip['gct'].notna().any()
@@ -505,7 +506,7 @@ def render_compare_tab():
         ), row=3, col=1)
 
     if has_gct_a or has_gct_b:
-        fig_sync.add_hline(y=237.0, line_dash="dot", line_color="#a78bfa", annotation_text="Edward 237ms 甜蜜點", row=3, col=1)
+        fig_sync.add_hline(y=237.0, line_dash="dot", line_color="#a78bfa", annotation_text="個人最佳觸地甜蜜點 (237ms)", row=3, col=1)
     elif has_cad_a or has_cad_b:
         # 若無 GCT 則改畫步頻
         if has_cad_a:
@@ -753,7 +754,7 @@ def render_compare_tab():
                 🏃‍♀️ 佩絲教練 (Coach Pace) 步態力學診斷
             </div>
             <ul style="margin: 0; padding-left: 18px; color: #e2e8f0; font-size: 0.88rem; line-height: 1.55;">
-                <li><strong>觸地時間剛性守恆：</strong> 觸地時間 GCT 差異僅 <code>{gct_diff_str}</code>，完美錨定在 Edward 個人 <strong>237ms 甜蜜點</strong>，下肢彈性剛性無懈可擊！</li>
+                <li><strong>觸地時間剛性守恆：</strong> 觸地時間 GCT 差異僅 <code>{gct_diff_str}</code>，完美錨定在個人 <strong>237ms 甜蜜點</strong>，下肢彈性剛性無懈可擊！</li>
                 <li><strong>速度差異物理本質：</strong> 步頻變動僅 <code>{cad_diff_pct:.1f}%</code>，而步幅縮減達 <code>{stride_diff_pct:.1f}%</code>！這證明速度差異源自於 <strong>「推蹬推進步幅縮短」</strong>，而非步頻崩潰。</li>
             </ul>
         </div>

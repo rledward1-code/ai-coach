@@ -1,11 +1,12 @@
 # app.py
 """
 AI Coach 運動科學戰情儀表板 (Sports Science Dashboard)
-專為 Edward (Max HR 210 / Rest HR 53 / LTHR 193) 量身打造。
-提供三大分頁視角：
-  - 🎛️ 課表微調模擬器 (支援間歇 / 節奏 / LSD 三模式)
-  - 📈 心率配速解析圖 (雙 Y 軸曲線 + 5K 分段對比圖)
-  - 📋 每公里詳細數據 (Lap by Lap 完整指標表)
+提供長跑與馬拉松全方位運動科學監控：
+  - 🔋 Tab 1: 體能就緒與 Coggan PMC 負荷管理
+  - 📅 Tab 2: 8 週課表實戰排程與 Google Sheet 動態同步
+  - 📈 Tab 3: 單次活動每公里力學與心率深度剖析
+  - 🎛️ Tab 4: 雙教練配速模擬與賽事沙盤推演
+  - ⚔️ Tab 5: 雙場對決比較 (Head-to-Head)
 """
 
 import os
@@ -242,15 +243,15 @@ if "garmin_pending_client" not in st.session_state:
     st.session_state.garmin_pending_client = None
 prof_init = load_user_profile() if "load_user_profile" in globals() else {}
 if "base_max_hr" not in st.session_state:
-    st.session_state.base_max_hr = prof_init.get('max_hr', 210)
+    st.session_state.base_max_hr = prof_init.get('max_hr', 190)
 if "base_rest_hr" not in st.session_state:
-    st.session_state.base_rest_hr = prof_init.get('rest_hr', 56)
+    st.session_state.base_rest_hr = prof_init.get('rest_hr', 58)
 if "base_lthr" not in st.session_state:
-    st.session_state.base_lthr = prof_init.get('lthr', 186)
+    st.session_state.base_lthr = prof_init.get('lthr', 172)
 if "base_z2_min" not in st.session_state:
-    st.session_state.base_z2_min = prof_init.get('z2_min', 145)
+    st.session_state.base_z2_min = prof_init.get('z2_min', 138)
 if "base_z2_max" not in st.session_state:
-    st.session_state.base_z2_max = prof_init.get('z2_max', 165)
+    st.session_state.base_z2_max = prof_init.get('z2_max', 154)
 if "base_source" not in st.session_state:
     st.session_state.base_source = "Garmin 手錶動態同步"
 
@@ -279,21 +280,21 @@ def apply_synced_readiness(readiness):
 def load_user_profile():
     defaults = {
         "name": "跑者",
-        "age": 56,
+        "age": 35,
         "gender": "男",
-        "weight_kg": 53.0,
-        "height_cm": 170.0,
-        "max_hr": 197,
-        "rest_hr": 57,
-        "lthr": 181,
-        "z2_min": 144,
-        "z2_max": 159,
-        "pb_full_time": "04:31:00",
-        "pb_half_time": "01:52:33",
-        "pb_full_min": 271.0,
-        "pb_half_min": 112.55,
-        "pb_full_label": "全馬 4:31:00 (2024台北馬)",
-        "pb_half_label": "半馬 1:52:33 (2025台北馬)"
+        "weight_kg": 65.0,
+        "height_cm": 172.0,
+        "max_hr": 190,
+        "rest_hr": 58,
+        "lthr": 172,
+        "z2_min": 138,
+        "z2_max": 154,
+        "pb_full_time": "04:15:00",
+        "pb_half_time": "01:55:00",
+        "pb_full_min": 255.0,
+        "pb_half_min": 115.0,
+        "pb_full_label": "全馬 4:15:00 (範例賽事)",
+        "pb_half_label": "半馬 1:55:00 (範例賽事)"
     }
     p_path = "data/user_profile.json"
     if os.path.exists(p_path):
@@ -330,20 +331,20 @@ def open_profile_dialog():
             u_name = st.text_input("跑者姓名 / 稱謂", value=curr.get("name", "跑者"))
             u_gender = st.selectbox("性別", options=["男", "女", "其他"], index=0 if curr.get("gender") == "男" else 1)
         with c2:
-            u_age = st.number_input("年齡 (歲)", min_value=10, max_value=100, value=int(curr.get("age", 56)))
-            u_weight = st.number_input("體重 (kg)", min_value=30.0, max_value=200.0, value=float(curr.get("weight_kg", 53.0)), step=0.5)
+            u_age = st.number_input("年齡 (歲)", min_value=10, max_value=100, value=int(curr.get("age", 35)))
+            u_weight = st.number_input("體重 (kg)", min_value=30.0, max_value=200.0, value=float(curr.get("weight_kg", 65.0)), step=0.5)
 
     with t_hr:
         st.markdown("<div style='font-size:0.85rem; color:#94a3b8; margin-bottom: 6px;'>設定您的最大心率、晨脈與 Zone 2 守護防線：</div>", unsafe_allow_html=True)
         ch1, ch2, ch3 = st.columns(3)
         with ch1:
-            u_max_hr = st.number_input("最高心率 (Max HR)", min_value=140, max_value=230, value=int(curr.get("max_hr", 197)))
-            u_rest_hr = st.number_input("安靜心率 (Rest HR)", min_value=35, max_value=100, value=int(curr.get("rest_hr", 57)))
+            u_max_hr = st.number_input("最高心率 (Max HR)", min_value=140, max_value=230, value=int(curr.get("max_hr", 190)))
+            u_rest_hr = st.number_input("安靜心率 (Rest HR)", min_value=35, max_value=100, value=int(curr.get("rest_hr", 58)))
         with ch2:
-            u_lthr = st.number_input("乳酸閾值 (LTHR)", min_value=120, max_value=210, value=int(curr.get("lthr", 181)))
+            u_lthr = st.number_input("乳酸閾值 (LTHR)", min_value=120, max_value=210, value=int(curr.get("lthr", 172)))
         with ch3:
-            u_z2_min = st.number_input("Zone 2 下限", min_value=100, max_value=180, value=int(curr.get("z2_min", 144)))
-            u_z2_max = st.number_input("Zone 2 上限", min_value=110, max_value=190, value=int(curr.get("z2_max", 159)))
+            u_z2_min = st.number_input("Zone 2 下限", min_value=100, max_value=180, value=int(curr.get("z2_min", 138)))
+            u_z2_max = st.number_input("Zone 2 上限", min_value=110, max_value=190, value=int(curr.get("z2_max", 154)))
             
         if garmin_cloud.has_valid_token():
             if st.button("🔄 一鍵帶入 Garmin 手錶動態分區", use_container_width=True):
@@ -360,11 +361,11 @@ def open_profile_dialog():
         st.markdown("<div style='font-size:0.85rem; color:#94a3b8; margin-bottom: 6px;'>歷史實戰最佳成績 (作為課表等效跑力推演之基準錨定)：</div>", unsafe_allow_html=True)
         cpb1, cpb2 = st.columns(2)
         with cpb1:
-            pb_f_str = st.text_input("全馬 PB (時:分:秒)", value=curr.get("pb_full_time", "04:31:00"), placeholder="04:31:00")
-            pb_f_lbl = st.text_input("全馬賽事註記", value=curr.get("pb_full_label", "全馬 4:31:00 (2024台北馬)"))
+            pb_f_str = st.text_input("全馬 PB (時:分:秒)", value=curr.get("pb_full_time", "04:15:00"), placeholder="04:15:00")
+            pb_f_lbl = st.text_input("全馬賽事註記", value=curr.get("pb_full_label", "全馬 4:15:00"))
         with cpb2:
-            pb_h_str = st.text_input("半馬 PB (時:分:秒)", value=curr.get("pb_half_time", "01:52:33"), placeholder="01:52:33")
-            pb_h_lbl = st.text_input("半馬賽事註記", value=curr.get("pb_half_label", "半馬 1:52:33 (2025台北馬)"))
+            pb_h_str = st.text_input("半馬 PB (時:分:秒)", value=curr.get("pb_half_time", "01:58:00"), placeholder="01:58:00")
+            pb_h_lbl = st.text_input("半馬賽事註記", value=curr.get("pb_half_label", "半馬 1:58:00"))
 
     with t_garmin:
         st.markdown("<div style='font-size:0.85rem; color:#94a3b8; margin-bottom: 6px;'>綁定 Garmin 官方 Personal API，享受全自動秒級動態同步：</div>", unsafe_allow_html=True)
@@ -595,29 +596,29 @@ function doPost(e) {
         if st.button("🔄 還原系統預設", use_container_width=True):
             system_defaults = {
                 "name": "跑者",
-                "age": 56,
+                "age": 35,
                 "gender": "男",
-                "weight_kg": 53.0,
-                "height_cm": 170.0,
-                "max_hr": 197,
-                "rest_hr": 57,
-                "lthr": 181,
-                "z2_min": 144,
-                "z2_max": 159,
-                "pb_full_time": "04:31:00",
-                "pb_half_time": "01:52:33",
-                "pb_full_min": 271.0,
-                "pb_half_min": 112.55,
-                "pb_full_label": "全馬 4:31:00 (2024台北馬)",
-                "pb_half_label": "半馬 1:52:33 (2025台北馬)"
+                "weight_kg": 65.0,
+                "height_cm": 172.0,
+                "max_hr": 190,
+                "rest_hr": 58,
+                "lthr": 172,
+                "z2_min": 138,
+                "z2_max": 154,
+                "pb_full_time": "04:15:00",
+                "pb_half_time": "01:55:00",
+                "pb_full_min": 255.0,
+                "pb_half_min": 115.0,
+                "pb_full_label": "全馬 4:15:00 (範例賽事)",
+                "pb_half_label": "半馬 1:55:00 (範例賽事)"
             }
             save_user_profile(system_defaults)
             st.session_state.user_profile = system_defaults
-            st.session_state.base_max_hr = 197
-            st.session_state.base_rest_hr = 57
-            st.session_state.base_lthr = 181
-            st.session_state.base_z2_min = 144
-            st.session_state.base_z2_max = 159
+            st.session_state.base_max_hr = 190
+            st.session_state.base_rest_hr = 58
+            st.session_state.base_lthr = 172
+            st.session_state.base_z2_min = 138
+            st.session_state.base_z2_max = 154
             st.rerun()
 
 # --- 4. 側邊欄：資料載入與同步中樞 ---
@@ -625,7 +626,7 @@ with st.sidebar:
     c_av, c_name, c_sett = st.columns([0.28, 0.44, 0.28])
     with c_av:
         avatar_path = None
-        for p in ["assets/Edward.png", "assets/edward.png"]:
+        for p in ["assets/Edward.png", "assets/edward.png", "assets/avatar.png"]:
             if os.path.exists(p):
                 avatar_path = p
                 break
@@ -641,16 +642,16 @@ with st.sidebar:
         if st.button("⚙️ 設定", help="修改跑者個人生理基線與歷史最佳戰績 (支援任何新跑者開箱即用)"):
             open_profile_dialog()
 
-    if user_name and user_name not in ["Edward", "跑者", "Runner"]:
+    if user_name and user_name not in ["跑者", "Runner", "Demo 跑者"]:
         st.markdown(f"### 🏃 {user_name} 運動生理基線")
     else:
         st.markdown("### 🏃 運動生理基線")
     
-    active_max_hr = st.session_state.get('base_max_hr', profile.get('max_hr', 197))
-    active_rest_hr = st.session_state.get('base_rest_hr', profile.get('rest_hr', 57))
-    active_lthr = st.session_state.get('base_lthr', profile.get('lthr', 181))
-    active_z2_min = st.session_state.get('base_z2_min', profile.get('z2_min', 144))
-    active_z2_max = st.session_state.get('base_z2_max', profile.get('z2_max', 159))
+    active_max_hr = st.session_state.get('base_max_hr', profile.get('max_hr', 190))
+    active_rest_hr = st.session_state.get('base_rest_hr', profile.get('rest_hr', 58))
+    active_lthr = st.session_state.get('base_lthr', profile.get('lthr', 172))
+    active_z2_min = st.session_state.get('base_z2_min', profile.get('z2_min', 138))
+    active_z2_max = st.session_state.get('base_z2_max', profile.get('z2_max', 154))
 
     st.session_state.active_max_hr = active_max_hr
     st.session_state.active_rest_hr = active_rest_hr
@@ -1940,8 +1941,7 @@ with tab_sim:
     if not os.path.exists(html_card_path):
         for p in [
             "assets/coach_dashboard_interactive.html",
-            ".agents/skills/running-coach-duo/templates/coach_dashboard_interactive.html",
-            "C:/Users/Edward/.gemini/antigravity/brain/0af66755-b010-43fb-835b-4354be4d4588/coach_dashboard_interactive.html"
+            ".agents/skills/running-coach-duo/templates/coach_dashboard_interactive.html"
         ]:
             if os.path.exists(p):
                 html_card_path = p
@@ -1952,20 +1952,20 @@ with tab_sim:
             html_code = hf.read()
             
         # 動態連動當前生理基線至課表模擬器與大賽沙盤推演
-        act_max = st.session_state.get('active_max_hr', 197)
-        act_rest = st.session_state.get('active_rest_hr', 57)
-        act_lthr = st.session_state.get('active_lthr', 181)
-        act_z2_min = st.session_state.get('active_z2_min', 144)
-        act_z2_max = st.session_state.get('active_z2_max', 159)
+        act_max = st.session_state.get('active_max_hr', 190)
+        act_rest = st.session_state.get('active_rest_hr', 58)
+        act_lthr = st.session_state.get('active_lthr', 172)
+        act_z2_min = st.session_state.get('active_z2_min', 138)
+        act_z2_max = st.session_state.get('active_z2_max', 154)
         act_mode = st.session_state.get('active_base_mode', 'Garmin')
 
         import re
         u_prof = st.session_state.get("user_profile", {})
         u_p_name = u_prof.get("name", user_name)
-        u_f_min = u_prof.get("pb_full_min", 271.0)
-        u_h_min = u_prof.get("pb_half_min", 112.55)
-        u_f_lbl = u_prof.get("pb_full_label", "全馬 4:31:00")
-        u_h_lbl = u_prof.get("pb_half_label", "半馬 1:52:33")
+        u_f_min = u_prof.get("pb_full_min", 255.0)
+        u_h_min = u_prof.get("pb_half_min", 118.0)
+        u_f_lbl = u_prof.get("pb_full_label", "全馬 4:15:00")
+        u_h_lbl = u_prof.get("pb_half_label", "半馬 1:58:00")
 
         # 1. 替換 JS 中的 BASELINE 常數 (注入動態 runnerName)
         dyn_baseline_js = f"""const BASELINE = {{

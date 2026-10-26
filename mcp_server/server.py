@@ -1,7 +1,7 @@
 # d:\ai-coach\mcp_server\server.py
 """
 AI Coach MCP 伺服器 (ai-coach-mcp)
-提供專業運動科學計算、Garmin FIT/CSV 活動解析、Edward 專屬生理校準與課表微調模擬。
+提供專業運動科學計算、Garmin FIT/CSV 活動解析、跑者個人生理校準與課表微調模擬。
 支援透過標準 Model Context Protocol (MCP) 與任何 LLM 客戶端連接。
 """
 
@@ -52,7 +52,7 @@ def simulate_training_plan(
 ) -> str:
     """
     微調與預估間歇訓練課表：
-    根據 Edward 專屬生理基線 (Max HR 210, Rest HR 53, LTHR 193)，模擬計算預估心率攀升、
+    根據跑者個人生理基線 (Max HR, Rest HR, LTHR)，模擬計算預估心率攀升、
     TRIMP 訓練負荷指數、心率漂移趨勢，並給出路格 (Luger) 量化紅綠燈評定與佩絲 (Pace) 身心恢復建議。
     同時提供可用於繪製互動圖表的數值資料。
     
@@ -75,21 +75,28 @@ def simulate_training_plan(
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 @app.tool()
-def get_edward_runner_profile() -> str:
+def get_runner_profile() -> str:
     """
-    獲取 Edward 專屬跑者個人生理特質、心率分區定義與核心規則：
-    包含 Max HR 210、Rest HR 53、LTHR 193、路格神聖 Zone 2 (148-163 bpm) 標準、
+    獲取跑者個人生理特質、心率分區定義與核心規則：
+    包含 Max HR、Rest HR、LTHR、Zone 2 守護線、
     步頻半頻 x 2 校正規則以及裝備歷史清單。
     
-    :return: 包含 Edward 生理基線與教練準則的 JSON 字串。
+    :return: 包含跑者生理基線與教練準則的 JSON 字串。
     """
-    profile = tools.get_edward_full_profile()
+    profile = tools.get_runner_full_profile()
     return json.dumps(profile, ensure_ascii=False, indent=2)
+
+@app.tool()
+def get_edward_runner_profile() -> str:
+    """
+    [向後相容別名] 獲取跑者個人生理特質與教練準則。
+    """
+    return get_runner_profile()
 
 @app.tool()
 def search_race_vault(query: str = "") -> str:
     """
-    檢索 Edward 歷年重大賽事實績資料庫 (2022~2025 台北馬、渣打馬、長榮半馬、金門馬、台南古都半馬) 與 MIZUNO 訓練營課表。
+    檢索歷年重大賽事實績資料庫 (台北馬、渣打馬、長榮半馬、金門馬、台南古都半馬等) 與 MIZUNO 訓練營課表。
     
     :param query: 檢索關鍵字，例如 "台北馬", "fit", "mizuno" 或留空檢索全部。
     :return: 相關檔案列表與元數據的 JSON 字串。
