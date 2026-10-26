@@ -835,6 +835,11 @@ with st.sidebar:
         except Exception:
             pass
 
+    st.divider()
+    with st.expander("🎬 系統實戰操作示範影片", expanded=False):
+        st.video("https://youtu.be/b9mxSmkRjIg")
+        st.caption("📺 跑步運動科學 - AI 教練系統操作展示")
+
 # --- 5. 主畫面：三大分頁戰情看板 ---
 
 # 頁首標題與跑者提醒
