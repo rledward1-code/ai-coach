@@ -39,9 +39,17 @@ def get_personal_api_key() -> str:
         try:
             with open(KEYS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data.get("GARMIN_PERSONAL_API_KEY", "").strip()
+                val = data.get("GARMIN_PERSONAL_API_KEY", "").strip()
+                if val:
+                    return val
         except Exception:
             pass
+    try:
+        import streamlit as st
+        if "GARMIN_PERSONAL_API_KEY" in st.secrets:
+            return str(st.secrets["GARMIN_PERSONAL_API_KEY"]).strip()
+    except Exception:
+        pass
     return ""
 
 def has_valid_token() -> bool:

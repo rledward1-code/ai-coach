@@ -19,9 +19,18 @@ def get_webhook_url(override_url=None):
     try:
         with open("keys.json", "r", encoding="utf-8") as f:
             keys = json.load(f)
-            return keys.get("GOOGLE_SHEET_WEBHOOK_URL", "")
+            val = keys.get("GOOGLE_SHEET_WEBHOOK_URL", "").strip()
+            if val:
+                return val
     except Exception:
-        return ""
+        pass
+    try:
+        import streamlit as st
+        if "GOOGLE_SHEET_WEBHOOK_URL" in st.secrets:
+            return str(st.secrets["GOOGLE_SHEET_WEBHOOK_URL"]).strip()
+    except Exception:
+        pass
+    return ""
 
 def _send_payload(payload, webhook_url=None):
     url = get_webhook_url(webhook_url)
