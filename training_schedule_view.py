@@ -45,9 +45,18 @@ def derive_csv_url_from_sheet_url(sheet_url: str) -> str:
 def get_gsheet_urls():
     """
     安全解析 Google Sheet 網址
-    優先序：1. Session 狀態 (設定介面即時修改) -> 2. Streamlit Secrets -> 3. 本地 keys.json
-    防止個人 Google 試算表 ID 外洩至公開 Git 儲存庫
+    - 訪客 Demo 模式：強制回傳公共 Demo 試算表，保護個人私密試算表絕不外洩
+    - Edward VIP 模式：從 Session -> Secrets -> keys.json 讀取個人私密試算表
     """
+    try:
+        import auth_manager
+        is_auth = auth_manager.is_authenticated()
+    except Exception:
+        is_auth = True
+
+    if not is_auth:
+        return DEFAULT_GSHEET_URL, DEFAULT_GSHEET_CSV_URL
+
     sheet_url = st.session_state.get("GOOGLE_SHEET_URL", "")
     csv_url = st.session_state.get("GOOGLE_SHEET_CSV_URL", "")
 

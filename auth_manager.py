@@ -55,11 +55,13 @@ def get_target_pin_hash() -> str:
 def check_auto_auth():
     """
     智慧自動身分檢測：
-    1. 本地開發環境 (有 keys.json 且在本地 localhost 運行) 預設自動解鎖
-    2. 支援 URL 參數認證 (例如 ?auth=edward888 或 ?pin=edward888)
+    1. 支援 URL 參數認證 (例如 ?auth=edward888 或 ?pin=edward888)
+    2. 若使用者手動點擊了切換為 Demo 模式，優先保持 Demo
+    3. 本地開發環境 (有 keys.json 且在本地 localhost 運行) 預設解鎖
     """
-    if st.session_state.get(AUTH_KEY, False):
-        return True
+    # 若明確處於 Demo 模式，不自動登入
+    if st.session_state.get("explicit_demo_mode", False):
+        return False
 
     # 檢查 URL 查詢參數
     try:
@@ -68,11 +70,16 @@ def check_auto_auth():
         if url_auth:
             if hash_pin(str(url_auth)) == get_target_pin_hash():
                 st.session_state[AUTH_KEY] = True
+                st.session_state["explicit_demo_mode"] = False
                 return True
     except Exception:
         pass
 
-    # 本地環境偵測 (若本地有合法 keys.json 且未在雲端 secrets 強制鎖定)
+    # 已經手動解鎖過
+    if st.session_state.get(AUTH_KEY, False):
+        return True
+
+    # 本地環境偵測 (若本地有合法 keys.json)
     if os.path.exists("keys.json"):
         st.session_state[AUTH_KEY] = True
         return True
@@ -88,6 +95,7 @@ def verify_input_pin(input_str: str) -> tuple[bool, str]:
     target = get_target_pin_hash()
     if hash_pin(input_str) == target:
         st.session_state[AUTH_KEY] = True
+        st.session_state["explicit_demo_mode"] = False
         st.session_state[FAIL_COUNT_KEY] = 0
         return True, "✅ 驗證成功！已解鎖 Edward 專屬運動科學模式！"
     else:
@@ -98,6 +106,11 @@ def verify_input_pin(input_str: str) -> tuple[bool, str]:
 def logout_user():
     """登出切換回訪客 Demo 模式"""
     st.session_state[AUTH_KEY] = False
+    st.session_state["explicit_demo_mode"] = True
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
     st.cache_data.clear()
 
 def is_authenticated() -> bool:

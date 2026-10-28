@@ -16,6 +16,15 @@ if sys.stdout.encoding != "utf-8":
 def get_webhook_url(override_url=None):
     if override_url:
         return override_url
+
+    # 訪客 Demo 模式：禁止使用個人 Webhook 寫入，保護個人試算表
+    try:
+        import auth_manager
+        if not auth_manager.is_authenticated():
+            return ""
+    except Exception:
+        pass
+
     try:
         with open("keys.json", "r", encoding="utf-8") as f:
             keys = json.load(f)

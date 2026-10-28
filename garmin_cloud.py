@@ -34,7 +34,14 @@ _cached_token = None
 _cached_token_exp = 0
 
 def get_personal_api_key() -> str:
-    """從 keys.json 讀取 GARMIN_PERSONAL_API_KEY"""
+    """從 keys.json 讀取 GARMIN_PERSONAL_API_KEY (Demo 模式下徹底隔離)"""
+    try:
+        import auth_manager
+        if not auth_manager.is_authenticated():
+            return ""
+    except Exception:
+        pass
+
     if os.path.exists(KEYS_FILE):
         try:
             with open(KEYS_FILE, "r", encoding="utf-8") as f:
