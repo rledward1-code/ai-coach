@@ -27,6 +27,7 @@ def cached_process_data(file_path):
 
 process_data = cached_process_data
 import garmin_cloud
+import auth_manager
 from compare_view import render_compare_tab
 from training_schedule_view import (
     render_sidebar_schedule_card,
@@ -262,7 +263,7 @@ if "pending_tags" not in st.session_state:
 DAILY_READINESS_PATH = "data/daily_readiness.json"
 
 def load_cached_readiness():
-    if os.path.exists(DAILY_READINESS_PATH):
+    if auth_manager.is_authenticated() and os.path.exists(DAILY_READINESS_PATH):
         try:
             with open(DAILY_READINESS_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -370,16 +371,17 @@ def load_user_profile():
         except Exception:
             pass
             
-    # 2. 本地優先覆蓋：若存在本地專屬設定檔 (受 .gitignore 保護)，無縫套用個人真實數據
-    for local_p in ["data/user_profile_local.json", "data/edward_physiology.json"]:
-        if os.path.exists(local_p):
-            try:
-                with open(local_p, "r", encoding="utf-8") as f:
-                    local_data = json.load(f)
-                    defaults.update(local_data)
-                    break
-            except Exception:
-                pass
+    # 2. 只有在 Edward 專屬認證模式下，才套用個人真實數據；Demo 模式下維持官方範本保護隱私
+    if auth_manager.is_authenticated():
+        for local_p in ["data/user_profile_local.json", "data/edward_physiology.json"]:
+            if os.path.exists(local_p):
+                try:
+                    with open(local_p, "r", encoding="utf-8") as f:
+                        local_data = json.load(f)
+                        defaults.update(local_data)
+                        break
+                except Exception:
+                    pass
     return defaults
 
 def save_user_profile(data):
@@ -931,6 +933,10 @@ with col_h_right:
         直接在 Antigravity 聊天室發問，享受頂級推理與動態會診！
     </div>
     """, unsafe_allow_html=True)
+
+# 身分認證與隱私防護徽章
+auth_manager.render_auth_badge()
+st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # 宣告五大核心分頁 (依照跑者每日使用動線優化：1.體能晨檢 -> 2.課表排程 -> 3.活動深度解析 -> 4.配速模擬與推演 -> 5.雙場對決比較)
 tab_pmc, tab_schedule, tab_activity, tab_sim, tab_compare = st.tabs([

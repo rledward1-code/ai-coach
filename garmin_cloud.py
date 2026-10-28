@@ -53,7 +53,13 @@ def get_personal_api_key() -> str:
     return ""
 
 def has_valid_token() -> bool:
-    """只要 keys.json 中有 GARMIN_PERSONAL_API_KEY 即視為已授權"""
+    """只有在已認證 (Edward 專屬模式) 且有有效金鑰時才視為已授權，隔離公開 Demo 模式"""
+    try:
+        import auth_manager
+        if not auth_manager.is_authenticated():
+            return False
+    except Exception:
+        pass
     key = get_personal_api_key()
     return bool(key and key.startswith("GCDC_"))
 

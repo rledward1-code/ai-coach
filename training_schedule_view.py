@@ -200,8 +200,16 @@ def load_schedule_data(force_reload=False):
         if fresh:
             return fresh
 
-    # 優先零延遲讀取本地專屬課表 (受 .gitignore 保護，絕不上傳 GitHub)
-    for p in [SCHEDULE_LOCAL_PATH, SCHEDULE_JSON_PATH]:
+    try:
+        import auth_manager
+        is_auth = auth_manager.is_authenticated()
+    except Exception:
+        is_auth = True
+
+    # 只有已認證身分才讀取本地 25 週專屬課表，否則回退到通用安全範本
+    target_paths = [SCHEDULE_LOCAL_PATH, SCHEDULE_JSON_PATH] if is_auth else [SCHEDULE_JSON_PATH]
+
+    for p in target_paths:
         if os.path.exists(p):
             try:
                 with open(p, "r", encoding="utf-8") as f:
