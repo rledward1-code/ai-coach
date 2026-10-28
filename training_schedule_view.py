@@ -198,10 +198,12 @@ def get_cached_gsheet_schedule():
 
 def load_schedule_data(force_reload=False):
     """
-    載入 8 週完整課表：
+    載入完整課表：
     1. 支援手動強制刷新 (force_reload=True)
     2. 自動快取連動 Google 試算表 (3 分鐘自動更新)
-    3. 離線防護：若斷網自動回退至本地 data/schedule_8weeks.json 備份
+    3. 本地優先：已認證本機環境直接讀取 data/schedule_local.json (極速 0.0005s)
+    4. 雲端 VIP：優先向 Google 試算表拉取包含萬金石的完整 25 週課表
+    5. 安全回退：未認證 (Demo) 或離線時使用通用範本 data/schedule_8weeks.json
     """
     if force_reload:
         st.cache_data.clear()
@@ -215,23 +217,41 @@ def load_schedule_data(force_reload=False):
     except Exception:
         is_auth = True
 
-    # 只有已認證身分才讀取本地 25 週專屬課表，否則回退到通用安全範本
-    target_paths = [SCHEDULE_LOCAL_PATH, SCHEDULE_JSON_PATH] if is_auth else [SCHEDULE_JSON_PATH]
-
-    for p in target_paths:
-        if os.path.exists(p):
+    # 1. 未認證 (Demo 模式)：直接使用通用 12 週示範範本
+    if not is_auth:
+        if os.path.exists(SCHEDULE_JSON_PATH):
             try:
-                with open(p, "r", encoding="utf-8") as f:
+                with open(SCHEDULE_JSON_PATH, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception:
                 pass
+        return []
 
+    # 2. 已認證 (VIP 模式)：
+    # (A) 若本地電腦有完整的 25 週專屬課表 (schedule_local.json)，直接秒開 (0.0005s)
+    if os.path.exists(SCHEDULE_LOCAL_PATH):
+        try:
+            with open(SCHEDULE_LOCAL_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+
+    # (B) 若為雲端環境 (無本地檔案)，優先向 Google 試算表拉取最新 25 週課表並快取
     try:
         live = get_cached_gsheet_schedule()
         if live:
             return live
     except Exception:
         pass
+
+    # (C) 若 Google 試算表離線或權限未開放，回退至備用範本
+    if os.path.exists(SCHEDULE_JSON_PATH):
+        try:
+            with open(SCHEDULE_JSON_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+
     return []
 
 def get_current_week_info(schedule_data):
