@@ -357,7 +357,8 @@ def fetch_and_save_latest_activity(client=None, force_download: bool = False) ->
 
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        url_acts = f"{BASE_URL}/activitylist-service/activities/search/activities?limit=1"
+        # 優先抓取最近活動並過濾跑步專項 (避免散步、健走干擾跑步教練診斷)
+        url_acts = f"{BASE_URL}/activitylist-service/activities/search/activities?limit=10"
         r_acts = _http_session.get(url_acts, headers=headers, timeout=10)
         if r_acts.status_code != 200:
             return None, f"取得活動清單失敗: HTTP {r_acts.status_code}"
@@ -366,7 +367,16 @@ def fetch_and_save_latest_activity(client=None, force_download: bool = False) ->
         if not acts:
             return None, "查無近期活動"
             
-        latest = acts[0]
+        # 智慧定位第一筆跑步活動 (路跑、跑步機、越野)
+        latest = None
+        for a in acts:
+            atype = a.get("activityType", {}).get("typeKey", "")
+            if "running" in atype or "run" in atype or a.get("distance", 0) > 3000:
+                latest = a
+                break
+        if not latest:
+            latest = acts[0]
+
         act_id = str(latest["activityId"])
         act_name = latest.get("activityName", "最新跑步活動")
         

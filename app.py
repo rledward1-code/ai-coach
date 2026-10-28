@@ -952,16 +952,44 @@ with st.sidebar:
 
     auto_sync_watcher()
 
-    # 若尚未載入任何活動，預設由 temp.fit 初始化
-    if st.session_state.df is None and os.path.exists("temp.fit"):
-        try:
-            df, summary, _, tags = process_data("temp.fit")
-            st.session_state.df = df
-            st.session_state.pending_summary = summary
-            st.session_state.pending_tags = tags
-            st.session_state.pending_file_name = "2026 長榮航空半程馬拉松 (21.26K)"
-        except Exception:
-            pass
+    # 若尚未載入任何活動，優先由 active_activity.json 或 temp.fit 智慧初始化 (絕不硬編碼活動名稱)
+    if st.session_state.df is None:
+        target_init_fit = None
+        target_init_name = "最新跑步活動"
+        
+        # 1. 優先檢查 active_activity.json
+        if os.path.exists("data/active_activity.json"):
+            try:
+                with open("data/active_activity.json", "r", encoding="utf-8") as f_act:
+                    meta = json.load(f_act)
+                p = meta.get("fit_path", "")
+                if p and os.path.exists(p):
+                    target_init_fit = p
+                    target_init_name = meta.get("name", "2026 長榮航空半程馬拉松 (21.26K)")
+            except Exception:
+                pass
+                
+        # 2. 備案檢查 temp.fit
+        if not target_init_fit and os.path.exists("temp.fit"):
+            target_init_fit = "temp.fit"
+            target_init_name = "手錶同步活動"
+            
+        if target_init_fit:
+            try:
+                df, summary, _, tags = process_data(target_init_fit)
+                st.session_state.df = df
+                st.session_state.pending_summary = summary
+                st.session_state.pending_tags = tags
+                # 依據解析出來的真實里程動態補充
+                if 'dist_km' in df.columns:
+                    tot_d = df['dist_km'].sum()
+                    if tot_d > 20 and "長榮" in target_init_name:
+                        target_init_name = f"2026 長榮航空半程馬拉松 ({tot_d:.2f}K)"
+                    elif "(" not in target_init_name:
+                        target_init_name = f"{target_init_name} ({tot_d:.2f}K)"
+                st.session_state.pending_file_name = target_init_name
+            except Exception:
+                pass
 
     st.divider()
     with st.expander("🎬 系統實戰操作示範影片", expanded=False):
