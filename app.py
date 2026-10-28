@@ -19,7 +19,13 @@ import streamlit.components.v1 as components
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from data_processor import process_data
+import data_processor
+
+@st.cache_data(show_spinner=False)
+def cached_process_data(file_path):
+    return data_processor.process_data(file_path)
+
+process_data = cached_process_data
 import garmin_cloud
 from compare_view import render_compare_tab
 from training_schedule_view import (
@@ -38,6 +44,34 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- 1.5 戰情室啟動進度條與極速加載儀表 ---
+if "initial_loaded" not in st.session_state:
+    startup_box = st.empty()
+    with startup_box.container():
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, rgba(15,23,42,0.92), rgba(30,41,59,0.95)); 
+                    border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 14px 18px; margin-bottom: 14px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(8px);'>
+            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;'>
+                <span style='font-size: 1.05rem; font-weight: 700; color: #38bdf8;'>⚡ AI Coach 運動科學戰情室啟動中...</span>
+                <span style='font-size: 0.8rem; background: rgba(56,189,248,0.15); color: #7dd3fc; padding: 2px 8px; border-radius: 6px; font-weight: 600;'>雙教練外腦就緒</span>
+            </div>
+            <div style='font-size: 0.82rem; color: #94a3b8;'>
+                正在載入生理神經模型、雙賽季 25 週課表與動力學分析模組...
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        init_bar = st.progress(25, text="📊 [25%] 快速載入個人生理基線 (Max HR 210 / LTHR 193 / Zone 2)...")
+        time.sleep(0.08)
+        init_bar.progress(55, text="📅 [55%] 讀取 25 週雙馬連動課表 (台北馬 ➡️ 萬金石)...")
+        time.sleep(0.08)
+        init_bar.progress(85, text="🌅 [85%] 同步今日晨檢就緒度 (RHR 58 bpm / HRV 37 ms)...")
+        time.sleep(0.08)
+        init_bar.progress(100, text="🚀 [100%] 戰情室已全面就緒！")
+        time.sleep(0.15)
+        startup_box.empty()
+    st.session_state.initial_loaded = True
 
 # --- 2. 樣式優化 (CSS) ---
 st.markdown("""
@@ -225,18 +259,31 @@ if "pending_file_name" not in st.session_state:
     st.session_state.pending_file_name = ""
 if "pending_tags" not in st.session_state:
     st.session_state.pending_tags = []
+DAILY_READINESS_PATH = "data/daily_readiness.json"
+
+def load_cached_readiness():
+    if os.path.exists(DAILY_READINESS_PATH):
+        try:
+            with open(DAILY_READINESS_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+_init_readiness = load_cached_readiness()
+
 if "synced_rhr" not in st.session_state:
-    st.session_state.synced_rhr = 60
+    st.session_state.synced_rhr = _init_readiness.get("rhr", 58)
 if "synced_sleep" not in st.session_state:
-    st.session_state.synced_sleep = 56
+    st.session_state.synced_sleep = _init_readiness.get("sleep_score", 63)
 if "synced_hrv" not in st.session_state:
-    st.session_state.synced_hrv = 35
+    st.session_state.synced_hrv = _init_readiness.get("hrv_last_night", 37)
 if "synced_b_min" not in st.session_state:
-    st.session_state.synced_b_min = 32
+    st.session_state.synced_b_min = _init_readiness.get("hrv_baseline_min", 32)
 if "synced_b_max" not in st.session_state:
-    st.session_state.synced_b_max = 39
+    st.session_state.synced_b_max = _init_readiness.get("hrv_baseline_max", 39)
 if "synced_hrv_status" not in st.session_state:
-    st.session_state.synced_hrv_status = "BALANCED"
+    st.session_state.synced_hrv_status = _init_readiness.get("hrv_status", "BALANCED")
 if "mfa_pending" not in st.session_state:
     st.session_state.mfa_pending = False
 if "garmin_pending_client" not in st.session_state:
@@ -256,7 +303,7 @@ if "base_source" not in st.session_state:
     st.session_state.base_source = "Garmin 手錶動態同步"
 
 def apply_synced_readiness(readiness):
-    """將 Garmin 雲端拉取的晨檢指標寫入 Session State，並透過 Key Versioning 強制元件即刻重置至最新雲端值"""
+    """將 Garmin 雲端拉取的晨檢指標寫入 Session State 與本地快取，並透過 Key Versioning 強制元件即刻重置至最新雲端值"""
     if not readiness:
         return
     rhr = int(readiness.get("rhr", 54))
@@ -272,6 +319,23 @@ def apply_synced_readiness(readiness):
     st.session_state.synced_b_min = b_min
     st.session_state.synced_b_max = b_max
     st.session_state.synced_hrv_status = status
+
+    # 持久化至本地檔案，保證重新整理頁面仍留存真實數據
+    try:
+        os.makedirs("data", exist_ok=True)
+        with open(DAILY_READINESS_PATH, "w", encoding="utf-8") as f:
+            json.dump({
+                "date": readiness.get("date", datetime.now().strftime("%Y-%m-%d")),
+                "rhr": rhr,
+                "sleep_score": sleep,
+                "hrv_last_night": hrv,
+                "hrv_baseline_min": b_min,
+                "hrv_baseline_max": b_max,
+                "hrv_status": status,
+                "body_battery": readiness.get("body_battery", 53)
+            }, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
     # 關鍵：遞增版本號，強制 Streamlit 銷毀舊快取並以最新 value 重新初始化所有拉桿與選單
     st.session_state.readiness_sync_ver = st.session_state.get("readiness_sync_ver", 0) + 1

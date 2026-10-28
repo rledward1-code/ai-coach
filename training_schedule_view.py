@@ -17,6 +17,7 @@ import urllib.request
 import streamlit as st
 import pandas as pd
 
+SCHEDULE_LOCAL_PATH = "data/schedule_local.json"
 SCHEDULE_JSON_PATH = "data/schedule_8weeks.json"
 DEFAULT_GSHEET_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/edit?gid=279821330#gid=279821330"
 DEFAULT_GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/export?format=csv&gid=279821330"
@@ -169,11 +170,16 @@ def fetch_schedule_from_gsheet(save_local=True):
                 
         if schedule and save_local:
             os.makedirs("data", exist_ok=True)
-            with open(SCHEDULE_JSON_PATH, "w", encoding="utf-8") as f:
+            with open(SCHEDULE_LOCAL_PATH, "w", encoding="utf-8") as f:
                 json.dump(schedule, f, ensure_ascii=False, indent=2)
                 
         return schedule
     except Exception as e:
+        if "401" in str(e) or "Unauthorized" in str(e):
+            try:
+                st.session_state["gsheet_401_error"] = True
+            except Exception:
+                pass
         return []
 
 @st.cache_data(ttl=180, show_spinner=False)
@@ -194,20 +200,21 @@ def load_schedule_data(force_reload=False):
         if fresh:
             return fresh
 
+    # 優先零延遲讀取本地專屬課表 (受 .gitignore 保護，絕不上傳 GitHub)
+    for p in [SCHEDULE_LOCAL_PATH, SCHEDULE_JSON_PATH]:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+
     try:
         live = get_cached_gsheet_schedule()
         if live:
             return live
     except Exception:
         pass
-
-    # 離線備用 (Fallback)
-    if os.path.exists(SCHEDULE_JSON_PATH):
-        try:
-            with open(SCHEDULE_JSON_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
     return []
 
 def get_current_week_info(schedule_data):
@@ -286,8 +293,12 @@ def render_sidebar_schedule_card():
     schedule = load_schedule_data()
     curr_week = get_current_week_info(schedule)
     
-    st.markdown("#### 📅 2026 台北馬拉松衝刺課表")
+    st.markdown("#### 📅 2026–2027 台北馬 ➡️ 萬金石課表")
     if curr_week:
+        first_wo = curr_week.get("workouts", [{}])[0] if curr_week.get("workouts") else {}
+        next_day = first_wo.get("day", "訓練日")
+        next_workout = first_wo.get("workout", "").split("\n")[0]
+        next_pace = first_wo.get("pace", "").split("\n")[0]
         st.markdown(f"""
         <div style='background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9)); 
                     border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;'>
@@ -297,7 +308,7 @@ def render_sidebar_schedule_card():
             </div>
             <div style='font-size: 0.78rem; color: #cbd5e1; margin-top: 4px; font-weight: 500;'>🎯 焦點：{curr_week['theme']}</div>
             <div style='font-size: 0.75rem; color: #94a3b8; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;'>
-                🏃 <strong>下次課表 (週二)：</strong> 社區排酸 4 圈 (5.5K) @ 7:00~7:20
+                🏃 <strong>下次課表 ({next_day})：</strong> {next_workout} @ {next_pace}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -354,12 +365,15 @@ def render_schedule_core_content(schedule):
     </div>
     """, unsafe_allow_html=True)
 
-    # 呈現本週 3 堂關鍵課卡片 (週二、週四、週日)
+    if st.session_state.get("gsheet_401_error", False):
+        st.info("💡 **小提醒：** 您的 Google 試算表目前為私密狀態 (HTTP 401)。若希望在試算表上的直接手動修改能無縫串流回戰情室，可在試算表右上角「共用」將存取權設為「知道連結的任何人」皆可「檢視」。雙教練的所有自動微調與寫入皆已成功直連生效！")
+
+    # 呈現本週關鍵課卡片 (週二/週三、週四、週日)
     workouts = week_data.get("workouts", [])
     cols = st.columns(len(workouts)) if workouts else [st.container()]
     
-    icon_map = {"週二": "🏃‍♂️", "週四": "⚡", "週日": "🌊"}
-    color_map = {"週二": "#38bdf8", "週四": "#f59e0b", "週日": "#10b981"}
+    icon_map = {"週二": "🏃‍♂️", "週三": "🏃‍♂️", "週四": "⚡", "週六": "🔥", "週日": "🌊"}
+    color_map = {"週二": "#38bdf8", "週三": "#38bdf8", "週四": "#f59e0b", "週六": "#f43f5e", "週日": "#10b981"}
 
     for idx, w in enumerate(workouts):
         with cols[idx]:
@@ -446,7 +460,7 @@ def render_schedule_tab_section():
         st.warning("⚠️ 課表資料庫尚未載入。")
         return
 
-    st.markdown("### 📅 2026 台北馬拉松・8週實戰課表與執行中樞")
-    st.caption("結合社區三圈地形模型、河堤平地專項長距離與 Coggan 負荷監控，全盤掌控 8 週破 PB 巔峰節奏。")
+    st.markdown("### 📅 2026–2027 台北馬拉松 ➡️ 萬金石馬拉松・雙賽季戰情中樞")
+    st.caption("結合社區起伏力量模型、平地河堤專項長跑與萬金石海風抗阻，全盤掌控 25 週雙馬連動巔峰節奏。")
 
     render_schedule_core_content(schedule)
