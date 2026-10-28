@@ -236,8 +236,8 @@
 
     </div> <!-- /grid lg:grid-cols-12 -->
 
-    <!-- 防水配速手環生成器 (擴充功能 1) -->
-    <div id="wristband-section" class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-amber-500/40 rounded-xl p-3.5 space-y-2.5">
+    <!-- 防水配速手環生成器 (擴充功能 1：僅在大賽推演模式下顯示) -->
+    <div id="wristband-section" class="hidden bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-amber-500/40 rounded-xl p-3.5 space-y-2.5">
       <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
         <div class="flex items-center gap-2">
           <span class="text-xl">🪪</span>
@@ -355,12 +355,15 @@
       const activeGrp = document.getElementById('controls-' + mode);
       if (activeGrp) activeGrp.classList.remove('hidden');
 
-      // 只有在 race 模式或長跑時展開手環區塊
+      // 只有在 race (大賽推演) 模式時展開手環區塊
       const wristbandSection = document.getElementById('wristband-section');
-      if (mode === 'race') {
-        wristbandSection.classList.remove('hidden');
-      } else {
-        wristbandSection.classList.add('hidden');
+      if (wristbandSection) {
+        if (mode === 'race') {
+          wristbandSection.classList.remove('hidden');
+          setTimeout(() => generateWristbandCanvas(), 50);
+        } else {
+          wristbandSection.classList.add('hidden');
+        }
       }
 
       updateSimulation();
@@ -1059,11 +1062,11 @@
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', updateSimulation);
       });
-      updateSimulation();
+      switchMode(currentMode);
     });
 
-    // 立即初始化
-    updateSimulation();
+    // 立即初始化模式
+    switchMode(currentMode);
   </script>
 </body>
 </html>
