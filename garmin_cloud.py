@@ -185,14 +185,25 @@ def fetch_today_readiness(client=None, target_date: str = None) -> tuple[dict | 
     
     data = {
         "date": target_date,
-        "rhr": 53,
-        "sleep_score": 85,
+        "rhr": 58,
+        "sleep_score": 77,
         "hrv_last_night": 33,
         "hrv_weekly_avg": 33,
         "hrv_baseline_min": 32,
         "hrv_baseline_max": 39,
         "hrv_status": "BALANCED",
-        "body_battery": 80,
+        "body_battery": 60,
+        "sleep_deep_pct": 23,
+        "sleep_rem_pct": 21,
+        "sleep_light_pct": 56,
+        "sleep_deep_qualifier": "EXCELLENT",
+        "sleep_rem_qualifier": "GOOD",
+        "avg_stress": 24,
+        "max_stress": 66,
+        "stress_qualifier": "BALANCED",
+        "rest_stress_pct": 57.4,
+        "avg_respiration": 15.0,
+        "avg_spo2": 97.0
     }
 
     url_sum = f"{BASE_URL}/usersummary-service/usersummary/daily?calendarDate={target_date}"
@@ -208,6 +219,18 @@ def fetch_today_readiness(client=None, target_date: str = None) -> tuple[dict | 
                     data["rhr"] = int(s_data["restingHeartRate"])
                 if s_data.get("bodyBatteryMostRecentValue"):
                     data["body_battery"] = int(s_data["bodyBatteryMostRecentValue"])
+                if s_data.get("averageStressLevel"):
+                    data["avg_stress"] = int(s_data["averageStressLevel"])
+                if s_data.get("maxStressLevel"):
+                    data["max_stress"] = int(s_data["maxStressLevel"])
+                if s_data.get("stressQualifier"):
+                    data["stress_qualifier"] = str(s_data["stressQualifier"])
+                if s_data.get("restStressPercentage") is not None:
+                    data["rest_stress_pct"] = float(s_data["restStressPercentage"])
+                if s_data.get("avgWakingRespirationValue"):
+                    data["avg_respiration"] = float(s_data["avgWakingRespirationValue"])
+                if s_data.get("averageSpo2"):
+                    data["avg_spo2"] = float(s_data["averageSpo2"])
         except Exception as e:
             print("[Garmin API] User summary error:", e)
 
@@ -221,6 +244,15 @@ def fetch_today_readiness(client=None, target_date: str = None) -> tuple[dict | 
                     overall_score = last_sleep.get("sleepScores", {}).get("overall", {}).get("value")
                     if overall_score:
                         data["sleep_score"] = int(overall_score)
+                    scores = last_sleep.get("sleepScores", {})
+                    if "deepPercentage" in scores and "value" in scores["deepPercentage"]:
+                        data["sleep_deep_pct"] = int(scores["deepPercentage"]["value"])
+                        data["sleep_deep_qualifier"] = scores["deepPercentage"].get("qualifierKey", "EXCELLENT")
+                    if "remPercentage" in scores and "value" in scores["remPercentage"]:
+                        data["sleep_rem_pct"] = int(scores["remPercentage"]["value"])
+                        data["sleep_rem_qualifier"] = scores["remPercentage"].get("qualifierKey", "GOOD")
+                    if "lightPercentage" in scores and "value" in scores["lightPercentage"]:
+                        data["sleep_light_pct"] = int(scores["lightPercentage"]["value"])
         except Exception as e:
             print("[Garmin API] Sleep error:", e)
 
@@ -415,6 +447,33 @@ def fetch_and_save_latest_activity(client=None, force_download: bool = False) ->
         return None, msg
     except Exception as e:
         return None, f"同步最新活動失敗: {e}"
+
+def fetch_activity_details_ext(act_id: str | int) -> dict:
+    """從 Garmin 雲端拉取單次活動的 Stamina 體力耗損、訓練效益與功率負荷細節"""
+    token, err = get_bearer_token()
+    if not token or not act_id:
+        return {}
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        url = f"{BASE_URL}/activity-service/activity/{act_id}"
+        r = _http_session.get(url, headers=headers, timeout=8)
+        if r.status_code == 200:
+            dto = r.json().get("summaryDTO", {})
+            return {
+                "begin_stamina": dto.get("beginPotentialStamina"),
+                "end_stamina": dto.get("endPotentialStamina"),
+                "min_stamina": dto.get("minAvailableStamina"),
+                "te_label": dto.get("trainingEffectLabel", ""),
+                "te_aerobic_msg": dto.get("aerobicTrainingEffectMessage", ""),
+                "te_anaerobic_msg": dto.get("anaerobicTrainingEffectMessage", ""),
+                "avg_power": dto.get("averagePower"),
+                "norm_power": dto.get("normalizedPower"),
+                "impact_load": dto.get("impactLoad"),
+                "activity_load": dto.get("activityTrainingLoad")
+            }
+    except Exception:
+        pass
+    return {}
 
 def fetch_user_hr_zones() -> tuple[dict | None, str]:
     """

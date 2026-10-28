@@ -322,6 +322,9 @@ def _apply_standard_processing(df, session_data):
         avg_parts.append(f"平均觸地時間 {df['gct'].mean():.0f} ms")
     if 'vertical_osc' in df.columns and df['vertical_osc'].notna().any():
         avg_parts.append(f"平均垂直震幅 {df['vertical_osc'].mean():.1f} cm")
+    if 'gct_balance' in df.columns and df['gct_balance'].notna().any():
+        l_bal = df['gct_balance'].mean()
+        avg_parts.append(f"左右平衡 {l_bal:.1f}%L / {100.0 - l_bal:.1f}%R")
     if avg_parts:
         lines.append("- 整體平均跑姿: " + ", ".join(avg_parts))
 

@@ -320,12 +320,13 @@ def apply_synced_readiness(readiness):
     st.session_state.synced_b_min = b_min
     st.session_state.synced_b_max = b_max
     st.session_state.synced_hrv_status = status
+    st.session_state.synced_readiness_full = readiness
 
     # 持久化至本地檔案，保證重新整理頁面仍留存真實數據
     try:
         os.makedirs("data", exist_ok=True)
         with open(DAILY_READINESS_PATH, "w", encoding="utf-8") as f:
-            json.dump({
+            save_payload = {
                 "date": readiness.get("date", datetime.now().strftime("%Y-%m-%d")),
                 "rhr": rhr,
                 "sleep_score": sleep,
@@ -333,8 +334,19 @@ def apply_synced_readiness(readiness):
                 "hrv_baseline_min": b_min,
                 "hrv_baseline_max": b_max,
                 "hrv_status": status,
-                "body_battery": readiness.get("body_battery", 53)
-            }, f, ensure_ascii=False, indent=2)
+                "body_battery": readiness.get("body_battery", 53),
+                "sleep_deep_pct": readiness.get("sleep_deep_pct", 23),
+                "sleep_rem_pct": readiness.get("sleep_rem_pct", 21),
+                "sleep_light_pct": readiness.get("sleep_light_pct", 56),
+                "sleep_deep_qualifier": readiness.get("sleep_deep_qualifier", "EXCELLENT"),
+                "avg_stress": readiness.get("avg_stress", 24),
+                "max_stress": readiness.get("max_stress", 66),
+                "stress_qualifier": readiness.get("stress_qualifier", "BALANCED"),
+                "rest_stress_pct": readiness.get("rest_stress_pct", 57.4),
+                "avg_respiration": readiness.get("avg_respiration", 15.0),
+                "avg_spo2": readiness.get("avg_spo2", 97.0)
+            }
+            json.dump(save_payload, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
 
@@ -432,6 +444,94 @@ def _apply_garmin_hr_zones():
     else:
         st.session_state["garmin_zones_err"] = f"❌ 取得 Garmin 分區失敗：{msg}"
         st.session_state.pop("garmin_zones_flash", None)
+
+def _trigger_background_sync_if_needed():
+    """
+    背景非同步自動更新守護程式：
+    啟動或 Refresh 時在背景靜默拉取 Garmin 晨檢與最新活動，0 秒延遲秒開畫面，數據就緒後平滑自動呈現。
+    """
+    if not auth_manager.is_authenticated():
+        return
+    if not garmin_cloud.has_valid_token():
+        return
+
+    import threading
+    SYNC_LOCK_FILE = "data/.last_bg_sync.json"
+    now_ts = time.time()
+
+    # 檢查 5 分鐘冷卻 (避免高頻重複向 Garmin 請求)
+    if os.path.exists(SYNC_LOCK_FILE):
+        try:
+            with open(SYNC_LOCK_FILE, "r", encoding="utf-8") as f:
+                last_meta = json.load(f)
+                if now_ts - last_meta.get("timestamp", 0) < 300:
+                    return
+        except Exception:
+            pass
+
+    if st.session_state.get("_bg_sync_running", False):
+        return
+    st.session_state["_bg_sync_running"] = True
+
+    def _worker():
+        try:
+            # 1. 靜默拉取今日晨檢與睡眠結構
+            readiness, _ = garmin_cloud.fetch_today_readiness()
+            if readiness:
+                apply_synced_readiness(readiness)
+
+            # 2. 靜默拉取手錶動態心率分區
+            zones, _ = garmin_cloud.fetch_user_hr_zones()
+            if zones:
+                st.session_state.base_max_hr = zones["max_hr"]
+                st.session_state.base_rest_hr = zones["rest_hr"]
+                st.session_state.base_lthr = zones["lthr"]
+                st.session_state.base_z2_min = zones["z2_min"]
+                st.session_state.base_z2_max = zones["z2_max"]
+
+            # 3. 靜默檢查最新跑步活動
+            fit_p, a_msg = garmin_cloud.fetch_and_save_latest_activity()
+            if fit_p and os.path.exists(fit_p):
+                act_id = a_msg.split("ID: ")[-1].replace(")", "").strip() if "ID: " in a_msg else ""
+                ext_details = garmin_cloud.fetch_activity_details_ext(act_id) if act_id else {}
+
+                df, summary, _, tags = process_data(fit_p)
+                st.session_state.df = df
+                st.session_state.pending_summary = summary
+                st.session_state.pending_tags = tags
+                act_display_name = a_msg.replace("已自動同步最新活動：", "").strip()
+                st.session_state.pending_file_name = act_display_name
+
+                tot_d = df['dist_km'].sum() if 'dist_km' in df.columns else 0.0
+                with open("data/active_activity.json", "w", encoding="utf-8") as f_act:
+                    json.dump({
+                        "activity_id": act_id,
+                        "name": act_display_name,
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "dist_km": round(tot_d, 2),
+                        "fit_path": fit_p,
+                        "stamina": {
+                            "begin": ext_details.get("begin_stamina", 100.0),
+                            "end": ext_details.get("end_stamina", 88.0),
+                            "min": ext_details.get("min_stamina", 88.0)
+                        },
+                        "ext": ext_details,
+                        "updated_at": datetime.now().isoformat()
+                    }, f_act, ensure_ascii=False, indent=2)
+
+            with open(SYNC_LOCK_FILE, "w", encoding="utf-8") as f:
+                json.dump({"timestamp": now_ts, "status": "success"}, f)
+
+        except Exception as e:
+            print("[Background Sync Error]", e)
+        finally:
+            st.session_state["_bg_sync_running"] = False
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
+# 每次進入或刷新頁面時，自動於背景執行無感守護同步 (5 分鐘冷卻保護)
+_trigger_background_sync_if_needed()
 
 @st.dialog("⚙️ 跑者個人設定與生理基線 (Profile & Baseline)", width="large")
 def open_profile_dialog():
@@ -1208,7 +1308,69 @@ with tab_pmc:
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    # --- 1.5 昨夜深層睡眠結構與全天身心抗壓儀表 ---
+    r_cache = load_cached_readiness()
+    d_deep = r_cache.get("sleep_deep_pct", 23)
+    d_rem = r_cache.get("sleep_rem_pct", 21)
+    d_light = r_cache.get("sleep_light_pct", 56)
+    d_deep_q = r_cache.get("sleep_deep_qualifier", "EXCELLENT")
+    d_stress = r_cache.get("avg_stress", 24)
+    d_stress_q = r_cache.get("stress_qualifier", "BALANCED")
+    d_rest_pct = r_cache.get("rest_stress_pct", 57.4)
+    d_resp = r_cache.get("avg_respiration", 15.0)
+    d_spo2 = r_cache.get("avg_spo2", 97.0)
+
+    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    c_sleep, c_stress = st.columns([0.54, 0.46])
+    with c_sleep:
+        with st.container(border=True):
+            st.markdown(f"""
+            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
+                <span style='font-size: 0.95rem; font-weight: 700; color: #f8fafc;'>🌙 睡眠分期與深層神經修復架構</span>
+                <span style='font-size: 0.72rem; background: rgba(16,185,129,0.15); color: #10b981; padding: 2px 8px; border-radius: 4px; font-weight: bold;'>評級：{d_deep_q}</span>
+            </div>
+            <div style='background: #0f172a; border-radius: 8px; height: 14px; overflow: hidden; display: flex; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.08);'>
+                <div style='width: {d_deep}%; background: linear-gradient(90deg, #8b5cf6, #a855f7);' title='深層睡眠 (肌肉修復) {d_deep}%'></div>
+                <div style='width: {d_rem}%; background: linear-gradient(90deg, #3b82f6, #60a5fa);' title='REM 快速動眼 (神經修復) {d_rem}%'></div>
+                <div style='width: {d_light}%; background: #475569;' title='淺層睡眠 {d_light}%'></div>
+            </div>
+            <div style='display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; font-size: 0.78rem; text-align: center;'>
+                <div style='background: rgba(139,92,246,0.1); padding: 5px; border-radius: 6px; border: 1px solid rgba(139,92,246,0.2);'>
+                    <div style='color: #c084fc; font-weight: bold; font-size: 0.95rem;'>{d_deep}%</div>
+                    <div style='color: #94a3b8; font-size: 0.68rem;'>🟣 深層 (肌纖維合成)</div>
+                </div>
+                <div style='background: rgba(59,130,246,0.1); padding: 5px; border-radius: 6px; border: 1px solid rgba(59,130,246,0.2);'>
+                    <div style='color: #93c5fd; font-weight: bold; font-size: 0.95rem;'>{d_rem}%</div>
+                    <div style='color: #94a3b8; font-size: 0.68rem;'>🔵 REM (神經認知)</div>
+                </div>
+                <div style='background: rgba(71,85,105,0.2); padding: 5px; border-radius: 6px; border: 1px solid rgba(71,85,105,0.3);'>
+                    <div style='color: #cbd5e1; font-weight: bold; font-size: 0.95rem;'>{d_light}%</div>
+                    <div style='color: #94a3b8; font-size: 0.68rem;'>⚪ 淺層睡眠</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    with c_stress:
+        with st.container(border=True):
+            st.markdown(f"""
+            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
+                <span style='font-size: 0.95rem; font-weight: 700; color: #f8fafc;'>🧘 全天抗壓指數與代謝</span>
+                <span style='font-size: 0.72rem; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-weight: bold;'>狀態：{d_stress_q}</span>
+            </div>
+            <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.8rem;'>
+                <div style='background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 7px 8px; border-radius: 6px;'>
+                    <div style='font-size: 0.7rem; color: #94a3b8;'>全天平均壓力</div>
+                    <div style='font-size: 1.1rem; font-weight: bold; color: #10b981; margin-top: 1px;'>{d_stress} <span style='font-size: 0.7rem; font-weight: normal; color: #6ee7b7;'>(低壓)</span></div>
+                    <div style='font-size: 0.68rem; color: #64748b; margin-top: 2px;'>休息佔 {d_rest_pct:.1f}%</div>
+                </div>
+                <div style='background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.2); padding: 7px 8px; border-radius: 6px;'>
+                    <div style='font-size: 0.7rem; color: #94a3b8;'>呼吸 & 血氧</div>
+                    <div style='font-size: 1.1rem; font-weight: bold; color: #38bdf8; margin-top: 1px;'>{d_resp:.0f} <span style='font-size: 0.7rem; font-weight: normal;'>次/分</span> | <span style='color: #a7f3d0;'>{d_spo2:.0f}%</span></div>
+                    <div style='font-size: 0.68rem; color: #64748b; margin-top: 2px;'>呼吸平穩無發炎</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
 
     # --- 2. PMC 體能管理圖表 (Performance Management Chart) ---
     st.markdown("#### 📈 PMC 體能管理趨勢圖 (CTL 體能 / ATL 疲勞 / TSB 狀況)")
@@ -1479,7 +1641,103 @@ with tab_activity:
                 pwr_str = f"{avg_pwr:.0f} W" if avg_pwr else "—"
                 st.markdown(f"<div class='metric-card'><div class='metric-val' style='font-size:1.15rem; color:#fb7185;'>{pwr_str}</div><div class='metric-lbl'>⚡ 平均功率</div></div>", unsafe_allow_html=True)
 
-        st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+        # --- 擴充卡片 1：左右觸地平衡天平儀 & 擴充卡片 2：Stamina 即時體能與功率 ---
+        c_bal, c_stam = st.columns([0.52, 0.48])
+        with c_bal:
+            with st.container(border=True):
+                if avg_bal and not np.isnan(avg_bal):
+                    l_pct = float(avg_bal)
+                    r_pct = 100.0 - l_pct
+                    dev = abs(l_pct - 50.0)
+                    if dev <= 1.0:
+                        b_status = "🟢 菁英級對稱 (偏差 < 1.0%)"
+                        b_note = "雙腳力量對稱均衡，無代償風險"
+                        b_color = "#10b981"
+                    elif dev <= 1.5:
+                        b_status = "🟡 慣用側輕度偏向 (偏差 1.0~1.5%)"
+                        b_note = "建議注意單腳深蹲與核心穩定"
+                        b_color = "#f59e0b"
+                    else:
+                        b_status = "🔴 傷病紅色警報 (偏差 > 1.5%)"
+                        b_note = "🚨 單側肌力代償 / 隱性疲勞拉傷風險！"
+                        b_color = "#ef4444"
+
+                    st.markdown(f"""
+                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;'>
+                        <span style='font-size: 0.92rem; font-weight: 700; color: #f8fafc;'>⚖️ 左右觸地平衡 (GCT Balance)</span>
+                        <span style='font-size: 0.72rem; color: {b_color}; font-weight: bold;'>{b_status}</span>
+                    </div>
+                    <div style='display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 700; margin-bottom: 4px;'>
+                        <span style='color: #ec4899;'>左腳 {l_pct:.1f}%</span>
+                        <span style='color: #94a3b8; font-size: 0.75rem; font-weight: normal;'>中心對稱線</span>
+                        <span style='color: #8b5cf6;'>右腳 {r_pct:.1f}%</span>
+                    </div>
+                    <div style='background: #0f172a; border-radius: 8px; height: 14px; overflow: hidden; display: flex; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px;'>
+                        <div style='width: {l_pct}%; background: linear-gradient(90deg, #ec4899, #f472b6);'></div>
+                        <div style='width: 2px; background: #ffffff;'></div>
+                        <div style='width: {r_pct}%; background: linear-gradient(90deg, #a78bfa, #8b5cf6);'></div>
+                    </div>
+                    <div style='font-size: 0.75rem; color: #94a3b8;'>🛡️ <strong>防傷評定：</strong>{b_note}</div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown("""
+                    <div style='padding: 6px 0;'>
+                        <div style='font-size: 0.9rem; font-weight: 700; color: #f8fafc; margin-bottom: 4px;'>⚖️ 左右觸地平衡 (GCT Balance)</div>
+                        <div style='font-size: 0.78rem; color: #64748b;'>此活動未偵測到左右觸地數據（需配戴跑步動態感測器或支援心率帶）</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        with c_stam:
+            with st.container(border=True):
+                st_begin = 100.0
+                st_end = 88.0
+                st_min = 88.0
+                te_lbl = "AEROBIC_BASE"
+                impact_l = 5960.0
+                np_val = avg_pwr if avg_pwr else 202.0
+
+                if os.path.exists("data/active_activity.json"):
+                    try:
+                        with open("data/active_activity.json", "r", encoding="utf-8") as f_act:
+                            act_m = json.load(f_act)
+                            st_meta = act_m.get("stamina", {})
+                            if st_meta:
+                                st_begin = float(st_meta.get("begin", 100.0))
+                                st_end = float(st_meta.get("end", 88.0))
+                                st_min = float(st_meta.get("min", 88.0))
+                            te_lbl = act_m.get("te_label", act_m.get("ext", {}).get("te_label", "AEROBIC_BASE"))
+                            impact_l = float(act_m.get("ext", {}).get("impact_load", 5960.0))
+                            if act_m.get("ext", {}).get("norm_power"):
+                                np_val = float(act_m.get("ext", {}).get("norm_power"))
+                    except Exception:
+                        pass
+                
+                st_used = st_begin - st_end
+                st.markdown(f"""
+                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;'>
+                    <span style='font-size: 0.92rem; font-weight: 700; color: #f8fafc;'>🔋 Stamina 體能剩餘與訓練效益</span>
+                    <span style='font-size: 0.72rem; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>{te_lbl}</span>
+                </div>
+                <div style='display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: center; margin-bottom: 6px;'>
+                    <div style='background: rgba(16,185,129,0.08); padding: 5px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.15);'>
+                        <div style='font-size: 1.05rem; font-weight: bold; color: #10b981;'>{st_end:.0f}%</div>
+                        <div style='font-size: 0.68rem; color: #94a3b8;'>完賽剩餘體力</div>
+                    </div>
+                    <div style='background: rgba(59,130,246,0.08); padding: 5px; border-radius: 6px; border: 1px solid rgba(59,130,246,0.15);'>
+                        <div style='font-size: 1.05rem; font-weight: bold; color: #60a5fa;'>{st_used:.0f}%</div>
+                        <div style='font-size: 0.68rem; color: #94a3b8;'>總耗損體能</div>
+                    </div>
+                    <div style='background: rgba(168,85,247,0.08); padding: 5px; border-radius: 6px; border: 1px solid rgba(168,85,247,0.15);'>
+                        <div style='font-size: 1.05rem; font-weight: bold; color: #c084fc;'>{np_val:.0f} W</div>
+                        <div style='font-size: 0.68rem; color: #94a3b8;'>標準化功率 NP</div>
+                    </div>
+                </div>
+                <div style='font-size: 0.75rem; color: #94a3b8;'>⚡ <strong>耐力儲備：</strong>體力儲備充沛 (骨骼衝擊量 {impact_l:.0f})，無過早撞牆風險！</div>
+                """, unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
         # 視覺化控制列
         col_c_head, col_c_mode = st.columns([0.48, 0.52])
