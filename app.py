@@ -406,9 +406,37 @@ if "last_auth_state" not in st.session_state or st.session_state.last_auth_state
 profile = st.session_state.user_profile
 user_name = profile.get("name", "跑者")
 
+def _init_profile_dialog_state(force=False):
+    """初始化跑者心率設定彈窗暫存狀態，確保數字輸入框精準雙向綁定"""
+    curr = st.session_state.get("user_profile", load_user_profile())
+    if force or "cfg_max_hr" not in st.session_state:
+        st.session_state["cfg_max_hr"] = int(curr.get("max_hr", 190))
+        st.session_state["cfg_rest_hr"] = int(curr.get("rest_hr", 58))
+        st.session_state["cfg_lthr"] = int(curr.get("lthr", 172))
+        st.session_state["cfg_z2_min"] = int(curr.get("z2_min", 138))
+        st.session_state["cfg_z2_max"] = int(curr.get("z2_max", 154))
+        st.session_state.pop("garmin_zones_flash", None)
+        st.session_state.pop("garmin_zones_err", None)
+
+def _apply_garmin_hr_zones():
+    """回呼函式：由按鈕觸發，於頁面重繪前即時向 Garmin 取得最新分區並直寫 session_state，讓上方輸入框立即刷新！"""
+    zones, msg = garmin_cloud.fetch_user_hr_zones()
+    if zones:
+        st.session_state["cfg_max_hr"] = max(140, min(230, int(zones['max_hr'])))
+        st.session_state["cfg_rest_hr"] = max(35, min(100, int(zones['rest_hr'])))
+        st.session_state["cfg_lthr"] = max(120, min(210, int(zones['lthr'])))
+        st.session_state["cfg_z2_min"] = max(100, min(180, int(zones['z2_min'])))
+        st.session_state["cfg_z2_max"] = max(110, min(190, int(zones['z2_max'])))
+        st.session_state["garmin_zones_flash"] = f"✅ 已成功將 Garmin 數值填入上方輸入格：Max {zones['max_hr']}, LTHR {zones['lthr']}, Zone 2: {zones['z2_min']}–{zones['z2_max']} bpm"
+        st.session_state.pop("garmin_zones_err", None)
+    else:
+        st.session_state["garmin_zones_err"] = f"❌ 取得 Garmin 分區失敗：{msg}"
+        st.session_state.pop("garmin_zones_flash", None)
+
 @st.dialog("⚙️ 跑者個人設定與生理基線 (Profile & Baseline)", width="large")
 def open_profile_dialog():
     curr = st.session_state.get("user_profile", load_user_profile())
+    _init_profile_dialog_state(force=False)
     st.caption("自訂跑者基本資訊、心率區間與歷史最佳成績，一鍵將整套 AI Coach 系統切換為您個人或新使用者的專屬教練！")
     
     t_prof, t_hr, t_pb, t_garmin, t_gsheet = st.tabs(["👤 基本資料", "💓 生理心率基線", "🏆 最佳戰績", "⌚ Garmin 綁定", "📊 Google 試算表"])
@@ -426,24 +454,20 @@ def open_profile_dialog():
         st.markdown("<div style='font-size:0.85rem; color:#94a3b8; margin-bottom: 6px;'>設定您的最大心率、晨脈與 Zone 2 守護防線：</div>", unsafe_allow_html=True)
         ch1, ch2, ch3 = st.columns(3)
         with ch1:
-            u_max_hr = st.number_input("最高心率 (Max HR)", min_value=140, max_value=230, value=int(curr.get("max_hr", 190)))
-            u_rest_hr = st.number_input("安靜心率 (Rest HR)", min_value=35, max_value=100, value=int(curr.get("rest_hr", 58)))
+            u_max_hr = st.number_input("最高心率 (Max HR)", min_value=140, max_value=230, key="cfg_max_hr")
+            u_rest_hr = st.number_input("安靜心率 (Rest HR)", min_value=35, max_value=100, key="cfg_rest_hr")
         with ch2:
-            u_lthr = st.number_input("乳酸閾值 (LTHR)", min_value=120, max_value=210, value=int(curr.get("lthr", 172)))
+            u_lthr = st.number_input("乳酸閾值 (LTHR)", min_value=120, max_value=210, key="cfg_lthr")
         with ch3:
-            u_z2_min = st.number_input("Zone 2 下限", min_value=100, max_value=180, value=int(curr.get("z2_min", 138)))
-            u_z2_max = st.number_input("Zone 2 上限", min_value=110, max_value=190, value=int(curr.get("z2_max", 154)))
+            u_z2_min = st.number_input("Zone 2 下限", min_value=100, max_value=180, key="cfg_z2_min")
+            u_z2_max = st.number_input("Zone 2 上限", min_value=110, max_value=190, key="cfg_z2_max")
             
         if garmin_cloud.has_valid_token():
-            if st.button("🔄 一鍵帶入 Garmin 手錶動態分區", use_container_width=True):
-                zones, msg = garmin_cloud.fetch_user_hr_zones()
-                if zones:
-                    st.success(f"已從 Garmin 讀取：Max {zones['max_hr']}, LTHR {zones['lthr']}, Zone 2: {zones['z2_min']}-{zones['z2_max']}")
-                    u_max_hr = zones['max_hr']
-                    u_rest_hr = zones['rest_hr']
-                    u_lthr = zones['lthr']
-                    u_z2_min = zones['z2_min']
-                    u_z2_max = zones['z2_max']
+            st.button("🔄 一鍵帶入 Garmin 手錶動態分區", use_container_width=True, on_click=_apply_garmin_hr_zones)
+            if "garmin_zones_flash" in st.session_state:
+                st.success(st.session_state["garmin_zones_flash"])
+            elif "garmin_zones_err" in st.session_state:
+                st.error(st.session_state["garmin_zones_err"])
 
     with t_pb:
         st.markdown("<div style='font-size:0.85rem; color:#94a3b8; margin-bottom: 6px;'>歷史實戰最佳成績 (作為課表等效跑力推演之基準錨定)：</div>", unsafe_allow_html=True)
@@ -654,16 +678,22 @@ function doPost(e) {
             pb_f_min = parse_to_min(pb_f_str, 271.0)
             pb_h_min = parse_to_min(pb_h_str, 112.55)
 
+            final_max_hr = int(st.session_state.get("cfg_max_hr", u_max_hr))
+            final_rest_hr = int(st.session_state.get("cfg_rest_hr", u_rest_hr))
+            final_lthr = int(st.session_state.get("cfg_lthr", u_lthr))
+            final_z2_min = int(st.session_state.get("cfg_z2_min", u_z2_min))
+            final_z2_max = int(st.session_state.get("cfg_z2_max", u_z2_max))
+
             new_profile = {
                 "name": u_name,
                 "age": u_age,
                 "gender": u_gender,
                 "weight_kg": u_weight,
-                "max_hr": u_max_hr,
-                "rest_hr": u_rest_hr,
-                "lthr": u_lthr,
-                "z2_min": u_z2_min,
-                "z2_max": u_z2_max,
+                "max_hr": final_max_hr,
+                "rest_hr": final_rest_hr,
+                "lthr": final_lthr,
+                "z2_min": final_z2_min,
+                "z2_max": final_z2_max,
                 "pb_full_time": pb_f_str,
                 "pb_half_time": pb_h_str,
                 "pb_full_min": round(pb_f_min, 2),
@@ -673,11 +703,11 @@ function doPost(e) {
             }
             save_user_profile(new_profile)
             st.session_state.user_profile = new_profile
-            st.session_state.base_max_hr = u_max_hr
-            st.session_state.base_rest_hr = u_rest_hr
-            st.session_state.base_lthr = u_lthr
-            st.session_state.base_z2_min = u_z2_min
-            st.session_state.base_z2_max = u_z2_max
+            st.session_state.base_max_hr = final_max_hr
+            st.session_state.base_rest_hr = final_rest_hr
+            st.session_state.base_lthr = final_lthr
+            st.session_state.base_z2_min = final_z2_min
+            st.session_state.base_z2_max = final_z2_max
             st.success("✅ 個人設定已儲存並同步至系統！")
             st.rerun()
     with c_reset:
@@ -702,11 +732,18 @@ function doPost(e) {
             }
             save_user_profile(system_defaults)
             st.session_state.user_profile = system_defaults
+            st.session_state["cfg_max_hr"] = 190
+            st.session_state["cfg_rest_hr"] = 58
+            st.session_state["cfg_lthr"] = 172
+            st.session_state["cfg_z2_min"] = 138
+            st.session_state["cfg_z2_max"] = 154
             st.session_state.base_max_hr = 190
             st.session_state.base_rest_hr = 58
             st.session_state.base_lthr = 172
             st.session_state.base_z2_min = 138
             st.session_state.base_z2_max = 154
+            st.session_state.pop("garmin_zones_flash", None)
+            st.session_state.pop("garmin_zones_err", None)
             st.rerun()
 
 # --- 4. 側邊欄：資料載入與同步中樞 ---
@@ -728,6 +765,7 @@ with st.sidebar:
     with c_sett:
         st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
         if st.button("⚙️ 設定", help="修改跑者個人生理基線與歷史最佳戰績 (支援任何新跑者開箱即用)"):
+            _init_profile_dialog_state(force=True)
             open_profile_dialog()
 
     if user_name and user_name not in ["跑者", "Runner", "Demo 跑者"]:
@@ -851,6 +889,7 @@ with st.sidebar:
         st.markdown("<span style='color: #f59e0b; font-size: 0.8rem; font-weight: bold;'>⚠️ 尚未綁定 Garmin 官方 API</span>", unsafe_allow_html=True)
         st.caption("請點擊左上方「⚙️ 設定」中的「☁️ Garmin 連結」頁籤輸入 API Token，享受全自動秒級同步。")
         if st.button("⚙️ 前往設定 Garmin 連結", use_container_width=True):
+            _init_profile_dialog_state(force=True)
             open_profile_dialog()
 
     st.divider()
