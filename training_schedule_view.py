@@ -20,12 +20,12 @@ import pandas as pd
 SCHEDULE_LOCAL_PATH = "data/schedule_local.json"
 SCHEDULE_JSON_PATH = "data/schedule_8weeks.json"
 DEFAULT_GSHEET_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/edit?gid=279821330#gid=279821330"
-DEFAULT_GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/export?format=csv&gid=279821330"
+DEFAULT_GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/10jQVBjpMCCnIF4PWwBb-Mm18q1ErJh5BcbXsARfDUPQ/gviz/tq?tqx=out:csv&gid=279821330"
 
 def derive_csv_url_from_sheet_url(sheet_url: str) -> str:
     """
-    智慧解析：自動從任何標準 Google 試算表瀏覽網址推導出 CSV 串流匯出網址
-    使用者只需貼上瀏覽器網址，系統自動完成串流轉換
+    智慧解析：自動從任何標準 Google 試算表瀏覽網址推導出免登入的 CSV 串流網址 (採用 Google Visualization API gviz/tq)
+    使用者只需貼上瀏覽器網址，系統自動完成免驗證串流轉換
     """
     if not sheet_url or "docs.google.com/spreadsheets" not in sheet_url:
         return ""
@@ -40,7 +40,7 @@ def derive_csv_url_from_sheet_url(sheet_url: str) -> str:
     match_gid = re.search(r"[#&?]gid=([0-9]+)", sheet_url)
     gid = match_gid.group(1) if match_gid else "0"
     
-    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid={gid}"
 
 def get_gsheet_urls():
     """
@@ -120,16 +120,53 @@ def save_gsheet_settings(sheet_url: str, webhook_url: str = ""):
     return csv_url
 
 def fetch_schedule_from_gsheet(save_local=True):
-    """向 Google 試算表 CSV 串流 API 拉取即時最新課表 (若未設定金鑰則安全略過)"""
-    _, csv_url = get_gsheet_urls()
-    if not csv_url:
+    """向 Google 試算表 CSV 串流 API 拉取即時最新課表 (優先採用免登入 gviz API)"""
+    _, raw_csv_url = get_gsheet_urls()
+    if not raw_csv_url:
         return []
 
+    # 候選網址建構 (優先採用 Google Visualization API 免登入端點，相容任何公開檢視連結)
+    candidate_urls = []
+    match_id = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", raw_csv_url)
+    match_gid = re.search(r"[#&?]gid=([0-9]+)", raw_csv_url)
+    if match_id:
+        sheet_id = match_id.group(1)
+        gid = match_gid.group(1) if match_gid else "0"
+        candidate_urls.append(f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid={gid}")
+    if raw_csv_url not in candidate_urls:
+        candidate_urls.append(raw_csv_url)
+
+    content = None
+    last_err = None
+
+    for target_url in candidate_urls:
+        try:
+            req = urllib.request.Request(target_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                raw_text = resp.read().decode("utf-8")
+                # 確保取回的是真實 CSV，而不是 Google 登入轉址 HTML
+                if "<html" not in raw_text.lower() and ("週次" in raw_text or "訓練日" in raw_text or "," in raw_text):
+                    content = raw_text
+                    break
+        except Exception as e:
+            last_err = e
+            continue
+
+    if not content:
+        if last_err and ("401" in str(last_err) or "Unauthorized" in str(last_err)):
+            try:
+                st.session_state["gsheet_401_error"] = True
+            except Exception:
+                pass
+        return []
+
+    # 成功取得資料，清除 401 提示
     try:
-        req = urllib.request.Request(csv_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            content = resp.read().decode("utf-8")
-            
+        st.session_state["gsheet_401_error"] = False
+    except Exception:
+        pass
+
+    try:
         reader = csv.reader(io.StringIO(content))
         all_rows = list(reader)
         
@@ -183,12 +220,7 @@ def fetch_schedule_from_gsheet(save_local=True):
                 json.dump(schedule, f, ensure_ascii=False, indent=2)
                 
         return schedule
-    except Exception as e:
-        if "401" in str(e) or "Unauthorized" in str(e):
-            try:
-                st.session_state["gsheet_401_error"] = True
-            except Exception:
-                pass
+    except Exception:
         return []
 
 @st.cache_data(ttl=180, show_spinner=False)
