@@ -385,14 +385,23 @@ def load_user_profile():
     return defaults
 
 def save_user_profile(data):
-    # 本地儲存一律優先寫入 user_profile_local.json (受 .gitignore 保護，絕不污染 Git)
-    local_p = "data/user_profile_local.json"
-    os.makedirs(os.path.dirname(local_p), exist_ok=True)
-    with open(local_p, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    # 只有在已認證 (Edward 專屬模式) 時才實體寫入 user_profile_local.json，防止訪客污染個人設定
+    if auth_manager.is_authenticated():
+        local_p = "data/user_profile_local.json"
+        os.makedirs(os.path.dirname(local_p), exist_ok=True)
+        with open(local_p, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
-if "user_profile" not in st.session_state:
+# 智慧動態追蹤認證狀態變化：當訪客切換為 VIP 模式時，立即重載 Edward 個人真實檔案
+curr_auth_state = auth_manager.is_authenticated()
+if "last_auth_state" not in st.session_state or st.session_state.last_auth_state != curr_auth_state or "user_profile" not in st.session_state:
     st.session_state.user_profile = load_user_profile()
+    st.session_state.last_auth_state = curr_auth_state
+    st.session_state.base_max_hr = st.session_state.user_profile.get('max_hr', 190)
+    st.session_state.base_rest_hr = st.session_state.user_profile.get('rest_hr', 58)
+    st.session_state.base_lthr = st.session_state.user_profile.get('lthr', 172)
+    st.session_state.base_z2_min = st.session_state.user_profile.get('z2_min', 138)
+    st.session_state.base_z2_max = st.session_state.user_profile.get('z2_max', 154)
 
 profile = st.session_state.user_profile
 user_name = profile.get("name", "跑者")
