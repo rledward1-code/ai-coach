@@ -15,7 +15,6 @@ temp.*
 data/.garmin_activities_cache.json
 data/garmin_pmc_cache.json
 data/active_activity.json
-data/daily_readiness.json
 data/schedule_wanjinshi_*.json
 
 # 3. 測試草稿與本地專屬封存資料夾

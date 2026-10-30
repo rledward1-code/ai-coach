@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-30",
+  "rhr": 57,
+  "sleep_score": 79,
+  "hrv_last_night": 31,
+  "hrv_weekly_avg": 33,
+  "hrv_baseline_min": 32,
+  "hrv_baseline_max": 39,
+  "hrv_status": "BALANCED",
+  "body_battery": 39,
+  "sleep_deep_pct": 11,
+  "sleep_rem_pct": 24,
+  "sleep_light_pct": 65,
+  "sleep_deep_qualifier": "FAIR",
+  "sleep_rem_qualifier": "EXCELLENT",
+  "avg_stress": 26,
+  "max_stress": 90,
+  "stress_qualifier": "BALANCED",
+  "rest_stress_pct": 54.77,
+  "avg_respiration": 14.0,
+  "avg_spo2": 97.0
+}
