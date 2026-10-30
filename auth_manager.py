@@ -55,7 +55,7 @@ def get_target_pin_hash() -> str:
 def check_auto_auth():
     """
     智慧自動身分檢測：
-    1. 支援 URL 參數認證 (例如 ?auth=edward888 或 ?pin=edward888)
+    1. 支援 URL 參數認證 (例如 ?auth=... 或 ?pin=...)，驗證通過後實施「閱後即焚」自動抹除 URL 參數
     2. 若使用者手動點擊了切換為 Demo 模式，優先保持 Demo
     3. 本地開發環境 (有 keys.json 且在本地 localhost 運行) 預設解鎖
     """
@@ -71,7 +71,22 @@ def check_auto_auth():
             if hash_pin(str(url_auth)) == get_target_pin_hash():
                 st.session_state[AUTH_KEY] = True
                 st.session_state["explicit_demo_mode"] = False
+                # 關鍵防護：驗證通過後立即抹除 URL 參數（閱後即焚機制），防止留在瀏覽器網址列、書籤或歷史紀錄中
+                for k in ["auth", "pin", "key"]:
+                    if k in st.query_params:
+                        try:
+                            del st.query_params[k]
+                        except Exception:
+                            pass
                 return True
+            else:
+                # 若 PIN 錯誤也立即清除，防止參數洩漏或惡意探測
+                for k in ["auth", "pin", "key"]:
+                    if k in st.query_params:
+                        try:
+                            del st.query_params[k]
+                        except Exception:
+                            pass
     except Exception:
         pass
 
@@ -149,7 +164,7 @@ def render_auth_badge():
 @st.dialog("🔐 解鎖 Edward 專屬運動科學戰情室")
 def open_pin_dialog():
     st.markdown("請輸入跑者專屬 PIN 碼，驗證通過後系統將即刻掛載您的 Garmin 真實數據與 25 週雙馬私密課表。")
-    in_pin = st.text_input("專屬 PIN 碼", type="password", placeholder="請輸入 PIN (預設: edward888)")
+    in_pin = st.text_input("專屬 PIN 碼", type="password", placeholder="請輸入個人授權 PIN 碼")
     col_d1, col_d2 = st.columns(2)
     with col_d1:
         if st.button("🚀 驗證並解鎖", type="primary", use_container_width=True):
