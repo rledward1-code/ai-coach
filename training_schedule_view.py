@@ -286,14 +286,72 @@ def load_schedule_data(force_reload=False):
 
     return []
 
-def get_current_week_info(schedule_data):
-    """取得當前週次資料 (優先定位本週 10/26，若無則回傳第一筆)"""
+def parse_week_dates(dates_str, base_year=2026):
+    """安全解析週次起訖日期 (支援跨年 2026 -> 2027)"""
+    if not dates_str:
+        return None, None
+    m = re.search(r'(\d{1,2})/(\d{1,2})\s*-\s*(\d{1,2})/(\d{1,2})', str(dates_str))
+    if not m:
+        return None, None
+    m1, d1, m2, d2 = map(int, m.groups())
+    y1 = base_year if m1 >= 9 else base_year + 1
+    y2 = base_year if m2 >= 9 else base_year + 1
+    try:
+        from datetime import date
+        return date(y1, m1, d1), date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+def get_current_week_idx_and_info(schedule_data):
+    """
+    動態依據今日日曆 (datetime.now) 定位當前進行中的週次
+    不再寫死任何固定週次或特定日期！
+    """
     if not schedule_data:
-        return None
-    for w in schedule_data:
-        if "10/26" in w.get("dates", "") or "第 5 週" in w.get("week_title", ""):
-            return w
-    return schedule_data[0]
+        return 0, None
+        
+    from datetime import date
+    today = date.today()
+    
+    # 1. 精確匹配今日所在的日期區間
+    for idx, w in enumerate(schedule_data):
+        s_d, e_d = parse_week_dates(w.get("dates", ""))
+        if s_d and e_d and s_d <= today <= e_d:
+            return idx, w
+            
+    # 2. 若今日早於第一週，預設第一週
+    s_first, _ = parse_week_dates(schedule_data[0].get("dates", ""))
+    if s_first and today < s_first:
+        return 0, schedule_data[0]
+        
+    # 3. 若今日晚於最後一週，預設最後一週
+    _, e_last = parse_week_dates(schedule_data[-1].get("dates", ""))
+    if e_last and today > e_last:
+        return len(schedule_data) - 1, schedule_data[-1]
+
+    # 4. 回退備案：搜尋月日比對
+    today_str = today.strftime("%m/%d")
+    for idx, w in enumerate(schedule_data):
+        if today_str in w.get("dates", ""):
+            return idx, w
+            
+    return 0, schedule_data[0]
+
+def get_current_week_info(schedule_data):
+    """相容性包裝：取得當前週次物件"""
+    _, w = get_current_week_idx_and_info(schedule_data)
+    return w
+
+DAY_NAME_TO_INT = {
+    "週一": 0, "星期一": 0, "Mon": 0,
+    "週二": 1, "星期二": 1, "Tue": 1,
+    "週三": 2, "星期三": 2, "Wed": 2,
+    "週四": 3, "星期四": 3, "Thu": 3,
+    "週五": 4, "星期五": 4, "Fri": 4,
+    "週六": 5, "星期六": 5, "Sat": 5,
+    "週日": 6, "星期日": 6, "Sun": 6,
+}
+WEEKDAY_NAMES = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
 
 def get_active_activity_metrics():
     """安全解析當前活動數值，完全容忍 summary 為 str, dict 或空值"""
@@ -358,16 +416,55 @@ def get_active_activity_metrics():
     }
 
 def render_sidebar_schedule_card():
-    """側邊欄常駐課表快速摘要卡片 (資訊直觀，直達 Tab 2 與 Google Sheet)"""
+    """側邊欄常駐課表快速摘要卡片 (動態感知今日星期，自動推算今日/下次課表)"""
     schedule = load_schedule_data()
-    curr_week = get_current_week_info(schedule)
+    cur_idx, curr_week = get_current_week_idx_and_info(schedule)
     
     st.markdown("#### 📅 2026–2027 台北馬 ➡️ 萬金石課表")
     if curr_week:
-        first_wo = curr_week.get("workouts", [{}])[0] if curr_week.get("workouts") else {}
-        next_day = first_wo.get("day", "訓練日")
-        next_workout = first_wo.get("workout", "").split("\n")[0]
-        next_pace = first_wo.get("pace", "").split("\n")[0]
+        from datetime import date
+        today = date.today()
+        cur_weekday = today.weekday()
+        today_name = WEEKDAY_NAMES[cur_weekday]
+
+        workouts = curr_week.get("workouts", [])
+        
+        # 尋找今日與下次課表
+        today_wo = None
+        next_wo = None
+        is_next_next_week = False
+
+        for wo in workouts:
+            d_int = DAY_NAME_TO_INT.get(wo.get("day", "")[:2])
+            if d_int == cur_weekday:
+                today_wo = wo
+            elif d_int is not None and d_int > cur_weekday and next_wo is None:
+                next_wo = wo
+
+        # 若本週後續已無課表，無縫往下一週尋找第一堂課
+        if next_wo is None and cur_idx + 1 < len(schedule):
+            next_week_workouts = schedule[cur_idx + 1].get("workouts", [])
+            if next_week_workouts:
+                next_wo = next_week_workouts[0]
+                is_next_next_week = True
+
+        # 組裝動態課表狀態文字
+        if today_wo:
+            wo_title = today_wo.get("workout", "").split("\n")[0]
+            wo_pace = today_wo.get("pace", "").split("\n")[0]
+            status_line = f"🔥 <strong>今日專項 ({today_wo.get('day')})：</strong> {wo_title} @ {wo_pace}"
+        elif next_wo:
+            prefix = "下週" if is_next_next_week else ""
+            n_day = f"{prefix}{next_wo.get('day')}"
+            wo_title = next_wo.get("workout", "").split("\n")[0]
+            wo_pace = next_wo.get("pace", "").split("\n")[0]
+            status_line = (
+                f"🛌 <strong>今日 ({today_name})：</strong> 休兵日 / 核心伸展與放鬆<br>"
+                f"🏃 <strong>下次課表 ({n_day})：</strong> {wo_title} @ {wo_pace}"
+            )
+        else:
+            status_line = f"🛌 <strong>今日 ({today_name})：</strong> 充分休整與恢復"
+
         st.markdown(f"""
         <div style='background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9)); 
                     border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;'>
@@ -376,8 +473,8 @@ def render_sidebar_schedule_card():
                 <span style='font-size: 0.7rem; background: rgba(56,189,248,0.15); color: #7dd3fc; padding: 2px 6px; border-radius: 4px;'>{curr_week['dates']}</span>
             </div>
             <div style='font-size: 0.78rem; color: #cbd5e1; margin-top: 4px; font-weight: 500;'>🎯 焦點：{curr_week['theme']}</div>
-            <div style='font-size: 0.75rem; color: #94a3b8; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;'>
-                🏃 <strong>下次課表 ({next_day})：</strong> {next_workout} @ {next_pace}
+            <div style='font-size: 0.75rem; color: #94a3b8; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px; line-height: 1.45;'>
+                {status_line}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -391,12 +488,8 @@ def render_schedule_core_content(schedule):
     week_titles = [f"{w['week_title']} ({w['dates']}) - {w['theme']}" for w in schedule]
     sheet_url, csv_url = get_gsheet_urls()
     
-    # 智慧定位預設週次 (尋找當前本週，如第 5 週)
-    default_idx = 0
-    for idx, w in enumerate(schedule):
-        if "10/26" in w.get("dates", "") or "第 5 週" in w.get("week_title", ""):
-            default_idx = idx
-            break
+    # 智慧動態定位預設週次 (日曆自動對齊，無硬編碼)
+    default_idx, current_calendar_week = get_current_week_idx_and_info(schedule)
 
     if sheet_url:
         col_w, col_sync, col_link = st.columns([0.54, 0.23, 0.23])
@@ -405,7 +498,7 @@ def render_schedule_core_content(schedule):
         col_link = None
 
     with col_w:
-        selected_idx = st.selectbox("切換週次 (預設第 5 週・本週)", range(len(schedule)), format_func=lambda i: week_titles[i], index=default_idx)
+        selected_idx = st.selectbox("切換週次 (已自動定位當前週次)", range(len(schedule)), format_func=lambda i: week_titles[i], index=default_idx)
     with col_sync:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         if st.button("🔄 刷新雲端課表", use_container_width=True, help="立即從 Google 試算表拉取最新變更"):
@@ -437,25 +530,52 @@ def render_schedule_core_content(schedule):
     if st.session_state.get("gsheet_401_error", False):
         st.info("💡 **小提醒：** 您的 Google 試算表目前為私密狀態 (HTTP 401)。若希望在試算表上的直接手動修改能無縫串流回戰情室，可在試算表右上角「共用」將存取權設為「知道連結的任何人」皆可「檢視」。雙教練的所有自動微調與寫入皆已成功直連生效！")
 
-    # 呈現本週關鍵課卡片 (週二/週三、週四、週日)
+    # 呈現本週關鍵課卡片 (動態判斷前期、今日、下次)
     workouts = week_data.get("workouts", [])
     cols = st.columns(len(workouts)) if workouts else [st.container()]
     
     icon_map = {"週二": "🏃‍♂️", "週三": "🏃‍♂️", "週四": "⚡", "週六": "🔥", "週日": "🌊"}
     color_map = {"週二": "#38bdf8", "週三": "#38bdf8", "週四": "#f59e0b", "週六": "#f43f5e", "週日": "#10b981"}
 
+    from datetime import date
+    today = date.today()
+    is_current_week = (selected_idx == default_idx)
+    cur_weekday = today.weekday()
+
+    # 先尋找在當前週次中，哪一堂是下次課表
+    next_wo_in_week = None
+    if is_current_week:
+        for wo in workouts:
+            d_int = DAY_NAME_TO_INT.get(wo.get("day", "")[:2])
+            if d_int is not None and d_int > cur_weekday:
+                next_wo_in_week = wo
+                break
+
     for idx, w in enumerate(workouts):
         with cols[idx]:
             day = w.get("day", "訓練日")
             icon = icon_map.get(day, "🏃")
             accent = color_map.get(day, "#38bdf8")
+            d_int = DAY_NAME_TO_INT.get(day[:2])
+
+            if is_current_week and d_int is not None:
+                if d_int < cur_weekday:
+                    badge_html = "<span style='font-size: 0.72rem; background: rgba(100,116,139,0.25); color: #94a3b8; padding: 2px 6px; border-radius: 4px;'>✅ 前期課表</span>"
+                elif d_int == cur_weekday:
+                    badge_html = "<span style='font-size: 0.72rem; background: rgba(239,68,68,0.25); color: #f87171; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>🔥 今日專項</span>"
+                elif w == next_wo_in_week:
+                    badge_html = "<span style='font-size: 0.72rem; background: rgba(16,185,129,0.25); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>🎯 下次備戰</span>"
+                else:
+                    badge_html = f"<span style='font-size: 0.72rem; background: rgba(255,255,255,0.08); color: {accent}; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>專項課表</span>"
+            else:
+                badge_html = f"<span style='font-size: 0.72rem; background: rgba(255,255,255,0.08); color: {accent}; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>專項課表</span>"
             
             st.markdown(f"""
             <div style='background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.1); 
                         border-top: 3px solid {accent}; border-radius: 10px; padding: 12px 14px; min-height: 260px; height: 100%;'>
                 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
                     <span style='font-weight: 700; font-size: 1.05rem; color: #f8fafc;'>{icon} {day}</span>
-                    <span style='font-size: 0.72rem; background: rgba(255,255,255,0.08); color: {accent}; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>專項課表</span>
+                    {badge_html}
                 </div>
                 <div style='font-size: 0.82rem; color: #e2e8f0; line-height: 1.45; margin-bottom: 10px; min-height: 60px;'>
                     {w.get("workout", "").replace(chr(10), "<br>")}
@@ -492,8 +612,24 @@ def render_schedule_core_content(schedule):
             else:
                 st.info("ℹ️ 尚未偵測到即時跑步活動。點擊側邊欄「⚡ 一鍵同步最新活動」即可帶入最新實跑數據。")
 
-            # 產生提問 Prompt (動態帶入當前跑者姓名與生理基線)
-            workout_sample = workouts[0].get("workout", "").split("\n")[0] if workouts else "課表訓練"
+            # 產生提問 Prompt (動態判斷今日課表或下次課表)
+            target_workout_desc = "課表訓練"
+            if is_current_week:
+                today_wo_found = None
+                for wo in workouts:
+                    d_int = DAY_NAME_TO_INT.get(wo.get("day", "")[:2])
+                    if d_int == cur_weekday:
+                        today_wo_found = wo
+                        break
+                if today_wo_found:
+                    target_workout_desc = f"【今日 {today_wo_found.get('day')} 專項】" + today_wo_found.get("workout", "").split("\n")[0]
+                elif next_wo_in_week:
+                    target_workout_desc = f"【今日休兵，備戰下次 {next_wo_in_week.get('day')}】" + next_wo_in_week.get("workout", "").split("\n")[0]
+                elif workouts:
+                    target_workout_desc = workouts[0].get("workout", "").split("\n")[0]
+            elif workouts:
+                target_workout_desc = workouts[0].get("workout", "").split("\n")[0]
+
             u_prof = st.session_state.get("user_profile", {})
             p_name = u_prof.get("name", "跑者")
             p_max = st.session_state.get("base_max_hr", u_prof.get("max_hr", 190))
@@ -505,7 +641,7 @@ def render_schedule_core_content(schedule):
                 f"【雙教練會診請求】\n"
                 f"我是 {p_name} (生理基線: Max HR {p_max} / LTHR {p_lthr} / Zone 2: {p_z2_min}-{p_z2_max} bpm)。\n"
                 f"目前訓練進度為：{week_data['week_title']}（主題：{week_data['theme']}）。\n"
-                f"我今日執行的課表為：{workout_sample}。\n"
+                f"目前對應進度為：{target_workout_desc}。\n"
             )
             if act_info["has_data"]:
                 prompt_text += (
