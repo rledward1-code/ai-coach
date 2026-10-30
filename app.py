@@ -385,6 +385,16 @@ def load_user_profile():
             
     # 2. 只有在 Edward 專屬認證模式下，才套用個人真實數據；Demo 模式下維持官方範本保護隱私
     if auth_manager.is_authenticated():
+        # 2a. 優先讀取 Streamlit Secrets (雲端加密保險箱，容器重啟/重新部署永久不丟失)
+        try:
+            if hasattr(st, "secrets") and "USER_PROFILE" in st.secrets:
+                sec_prof = dict(st.secrets["USER_PROFILE"])
+                defaults.update(sec_prof)
+                return defaults
+        except Exception:
+            pass
+
+        # 2b. 檢查伺服器/本機安全隔離檔案 (受 .gitignore 保護)
         for local_p in ["data/user_profile_local.json", "data/edward_physiology.json"]:
             if os.path.exists(local_p):
                 try:
