@@ -468,12 +468,19 @@ def render_sidebar_schedule_card():
         else:
             status_line = f"🛌 <strong>今日 ({today_name})：</strong> 充分休整與恢復"
 
+        completed_count = sum(1 for wo in workouts if wo.get("actual_summary"))
+        total_count = len(workouts)
+        comp_badge = f"<span style='font-size: 0.68rem; background: rgba(16,185,129,0.25); color: #34d399; padding: 1px 5px; border-radius: 4px; font-weight: bold;'>{completed_count}/{total_count} 完成</span>" if completed_count > 0 else ""
+
         st.markdown(f"""
         <div style='background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9)); 
                     border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;'>
             <div style='display: flex; justify-content: space-between; align-items: center;'>
                 <span style='font-size: 0.85rem; font-weight: 700; color: #38bdf8;'>{curr_week['week_title']}</span>
-                <span style='font-size: 0.7rem; background: rgba(56,189,248,0.15); color: #7dd3fc; padding: 2px 6px; border-radius: 4px;'>{curr_week['dates']}</span>
+                <div style='display: flex; gap: 4px; align-items: center;'>
+                    {comp_badge}
+                    <span style='font-size: 0.7rem; background: rgba(56,189,248,0.15); color: #7dd3fc; padding: 2px 6px; border-radius: 4px;'>{curr_week['dates']}</span>
+                </div>
             </div>
             <div style='font-size: 0.78rem; color: #cbd5e1; margin-top: 4px; font-weight: 500;'>🎯 焦點：{curr_week['theme']}</div>
             <div style='font-size: 0.75rem; color: #94a3b8; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px; line-height: 1.45;'>
@@ -535,15 +542,57 @@ def render_schedule_core_content(schedule):
 
     # 呈現本週關鍵課卡片 (動態判斷前期、今日、下次)
     workouts = week_data.get("workouts", [])
-    cols = st.columns(len(workouts)) if workouts else [st.container()]
     
-    icon_map = {"週二": "🏃‍♂️", "週三": "🏃‍♂️", "週四": "⚡", "週六": "🔥", "週日": "🌊"}
-    color_map = {"週二": "#38bdf8", "週三": "#38bdf8", "週四": "#f59e0b", "週六": "#f43f5e", "週日": "#10b981"}
-
     from datetime import date
     today = date.today()
     is_current_week = (selected_idx == default_idx)
+    is_past_week = (selected_idx < default_idx)
+    is_future_week = (selected_idx > default_idx)
     cur_weekday = today.weekday()
+
+    # 智慧計算本週/該週完成指標
+    completed_workouts = [w for w in workouts if w.get("actual_summary")]
+    total_workouts = len(workouts)
+    completion_rate = int((len(completed_workouts) / total_workouts * 100)) if total_workouts > 0 else 0
+
+    # 訓練回顧面板：只要有完成紀錄或是歷史週次，皆優雅呈現
+    if completed_workouts:
+        items_html = ""
+        for cw in completed_workouts:
+            act_text = cw.get("actual_summary", "")
+            d_name = cw.get("day", "")
+            w_short = cw.get("workout", "").split("\n")[0][:22]
+            items_html += f"<li style='margin-bottom: 4px;'><strong>{d_name} ({w_short})：</strong> {act_text}</li>"
+
+        panel_title = "📜 歷史週次訓練回顧與執行覆盤" if is_past_week else "📜 本週實跑進度與執行回顧"
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.85)); 
+                    border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;'>
+            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
+                <span style='font-size: 0.95rem; font-weight: 700; color: #34d399;'>
+                    {panel_title} (Training Retrospective)
+                </span>
+                <span style='font-size: 0.78rem; background: rgba(16, 185, 129, 0.25); color: #6ee7b7; padding: 2px 10px; border-radius: 12px; font-weight: 600;'>
+                    達成率：{len(completed_workouts)} / {total_workouts} 堂 ({completion_rate}%)
+                </span>
+            </div>
+            <ul style='font-size: 0.8rem; color: #cbd5e1; margin: 0; padding-left: 18px; line-height: 1.55;'>
+                {items_html}
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    elif is_past_week:
+        st.markdown(f"""
+        <div style='background: rgba(30, 41, 59, 0.5); border: 1px dashed rgba(148, 163, 184, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;'>
+            <span style='font-size: 0.82rem; color: #94a3b8;'>
+                ⏳ <strong>歷史前期課表檢閱</strong>：本週目前尚無 F 欄回填紀錄。您可在下方檢閱當時規劃之專項，或展開下方回填中樞進行歷史數據補充。
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    cols = st.columns(len(workouts)) if workouts else [st.container()]
+    icon_map = {"週二": "🏃‍♂️", "週三": "🏃‍♂️", "週四": "⚡", "週六": "🔥", "週日": "🌊"}
+    color_map = {"週二": "#38bdf8", "週三": "#38bdf8", "週四": "#f59e0b", "週六": "#f43f5e", "週日": "#10b981"}
 
     # 先尋找在當前週次中，哪一堂是下次課表
     next_wo_in_week = None
@@ -560,18 +609,27 @@ def render_schedule_core_content(schedule):
             icon = icon_map.get(day, "🏃")
             accent = color_map.get(day, "#38bdf8")
             d_int = DAY_NAME_TO_INT.get(day[:2])
+            has_summary = bool(w.get("actual_summary"))
 
-            if is_current_week and d_int is not None:
+            if has_summary:
+                badge_html = "<span style='font-size: 0.72rem; background: rgba(16,185,129,0.25); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>🏆 實跑已驗證</span>"
+                card_border = "border: 1px solid rgba(16, 185, 129, 0.45); border-top: 3px solid #10b981;"
+            elif is_past_week:
+                badge_html = "<span style='font-size: 0.72rem; background: rgba(100,116,139,0.2); color: #94a3b8; padding: 2px 6px; border-radius: 4px;'>⏳ 歷史排程</span>"
+                card_border = f"border: 1px solid rgba(255,255,255,0.08); border-top: 3px solid {accent};"
+            elif is_current_week and d_int is not None:
                 if d_int < cur_weekday:
                     badge_html = "<span style='font-size: 0.72rem; background: rgba(100,116,139,0.25); color: #94a3b8; padding: 2px 6px; border-radius: 4px;'>✅ 前期課表</span>"
                 elif d_int == cur_weekday:
                     badge_html = "<span style='font-size: 0.72rem; background: rgba(239,68,68,0.25); color: #f87171; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>🔥 今日專項</span>"
                 elif w == next_wo_in_week:
-                    badge_html = "<span style='font-size: 0.72rem; background: rgba(16,185,129,0.25); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>🎯 下次備戰</span>"
+                    badge_html = "<span style='font-size: 0.72rem; background: rgba(56,189,248,0.25); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>🎯 下次備戰</span>"
                 else:
                     badge_html = f"<span style='font-size: 0.72rem; background: rgba(255,255,255,0.08); color: {accent}; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>專項課表</span>"
+                card_border = f"border: 1px solid rgba(255,255,255,0.1); border-top: 3px solid {accent};"
             else:
                 badge_html = f"<span style='font-size: 0.72rem; background: rgba(255,255,255,0.08); color: {accent}; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>專項課表</span>"
+                card_border = f"border: 1px solid rgba(255,255,255,0.1); border-top: 3px solid {accent};"
             
             actual_summary = w.get("actual_summary", "")
             actual_html = ""
@@ -584,8 +642,7 @@ def render_schedule_core_content(schedule):
                 """
 
             st.markdown(f"""
-            <div style='background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.1); 
-                        border-top: 3px solid {accent}; border-radius: 10px; padding: 12px 14px; min-height: 260px; height: 100%;'>
+            <div style='background: rgba(15, 23, 42, 0.7); {card_border} border-radius: 10px; padding: 12px 14px; min-height: 260px; height: 100%;'>
                 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
                     <span style='font-weight: 700; font-size: 1.05rem; color: #f8fafc;'>{icon} {day}</span>
                     {badge_html}

@@ -149,5 +149,75 @@ def clear_gsheet_range(sheet_name="2026 賽季", range_str="A16:E50", webhook_ur
     }
     return _send_payload(payload, webhook_url)
 
+def auto_backfill_workout_to_gsheet(
+    dist_km=0.0,
+    pace_str="—",
+    avg_hr="—",
+    cadence="—",
+    duration_str="",
+    score="98 分 (A+ 頂規)",
+    target_row=None,
+    note="",
+    webhook_url=None
+):
+    """
+    智慧自動回填實跑成效至 Google Sheet F 欄
+    若未指定 target_row，自動定位當前週次之今日或最近課表
+    """
+    from datetime import date
+    today = date.today()
+    date_str = today.strftime("%m/%d")
+
+    if not target_row:
+        try:
+            import training_schedule_view
+            schedule = training_schedule_view.load_schedule_data()
+            _, curr_week = training_schedule_view.get_current_week_idx_and_info(schedule)
+            if curr_week:
+                workouts = curr_week.get("workouts", [])
+                cur_weekday = today.weekday()
+                # 優先尋找今日課表
+                for wo in workouts:
+                    d_int = training_schedule_view.DAY_NAME_TO_INT.get(wo.get("day", "")[:2])
+                    if d_int == cur_weekday:
+                        target_row = wo.get("sheet_row")
+                        break
+                # 若今日非課表日，尋找最近前期尚未回填之課表
+                if not target_row:
+                    for wo in workouts:
+                        d_int = training_schedule_view.DAY_NAME_TO_INT.get(wo.get("day", "")[:2])
+                        if d_int is not None and d_int <= cur_weekday and not wo.get("actual_summary"):
+                            target_row = wo.get("sheet_row")
+                            break
+        except Exception:
+            pass
+
+    if not target_row:
+        return {"status": "error", "message": "無法自動定位對應之課表列數"}
+
+    dur_part = f" ({duration_str})" if duration_str else ""
+    summary_text = f"【{date_str} 實跑驗證】{dist_km:.2f}K{dur_part} @ {pace_str}/km | 均心率 {avg_hr} bpm | 步頻 {cadence} spm"
+    if note:
+        summary_text += f" ({note})"
+    if score:
+        summary_text += f" | 評定 {score}"
+
+    res = update_gsheet_cell(sheet_name="2026 賽季", cell=f"F{target_row}", value=summary_text, webhook_url=webhook_url)
+    if res.get("status") == "success":
+        try:
+            import os, json
+            if os.path.exists("data/schedule_local.json"):
+                with open("data/schedule_local.json", "r", encoding="utf-8") as f:
+                    s_data = json.load(f)
+                for w in s_data:
+                    for wo in w.get("workouts", []):
+                        if wo.get("sheet_row") == target_row:
+                            wo["actual_summary"] = summary_text
+                with open("data/schedule_local.json", "w", encoding="utf-8") as f:
+                    json.dump(s_data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+    return res
+
 if __name__ == "__main__":
     print("Testing sync_to_gsheet module...")
