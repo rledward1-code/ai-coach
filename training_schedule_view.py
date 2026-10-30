@@ -180,7 +180,7 @@ def fetch_schedule_from_gsheet(save_local=True):
                 start_idx = idx + 1
                 break
                 
-        for r in all_rows[start_idx:]:
+        for row_idx, r in enumerate(all_rows[start_idx:], start=start_idx + 1):
             if not r or len(r) < 3:
                 continue
                 
@@ -189,6 +189,7 @@ def fetch_schedule_from_gsheet(save_local=True):
             workout_col = r[2].strip() if len(r) > 2 else ""
             pace_col = r[3].strip() if len(r) > 3 else ""
             hr_col = r[4].strip() if len(r) > 4 else ""
+            actual_col = r[5].strip() if len(r) > 5 else ""
             
             if not any([w_col, day_col, workout_col]):
                 continue
@@ -211,7 +212,9 @@ def fetch_schedule_from_gsheet(save_local=True):
                     "day": day_col,
                     "workout": workout_col,
                     "pace": pace_col,
-                    "hr_note": hr_col
+                    "hr_note": hr_col,
+                    "actual_summary": actual_col,
+                    "sheet_row": row_idx
                 })
                 
         if schedule and save_local:
@@ -570,6 +573,16 @@ def render_schedule_core_content(schedule):
             else:
                 badge_html = f"<span style='font-size: 0.72rem; background: rgba(255,255,255,0.08); color: {accent}; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>專項課表</span>"
             
+            actual_summary = w.get("actual_summary", "")
+            actual_html = ""
+            if actual_summary:
+                actual_html = f"""
+                <div style='background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 6px; padding: 6px 8px; margin-top: 8px;'>
+                    <div style='font-size: 0.72rem; color: #34d399; font-weight: 700;'>📊 實跑驗證 (F 欄)：</div>
+                    <div style='font-size: 0.76rem; color: #e2e8f0; line-height: 1.35; white-space: pre-line;'>{actual_summary}</div>
+                </div>
+                """
+
             st.markdown(f"""
             <div style='background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.1); 
                         border-top: 3px solid {accent}; border-radius: 10px; padding: 12px 14px; min-height: 260px; height: 100%;'>
@@ -588,6 +601,7 @@ def render_schedule_core_content(schedule):
                     <div style='font-size: 0.72rem; color: #94a3b8;'>💓 生理/心率防線與技術：</div>
                     <div style='font-size: 0.76rem; color: #cbd5e1; line-height: 1.35;'>{w.get("hr_note", "—")}</div>
                 </div>
+                {actual_html}
             </div>
             """, unsafe_allow_html=True)
 
@@ -657,6 +671,90 @@ def render_schedule_core_content(schedule):
         with c_diag2:
             st.markdown("<div style='font-size:0.8rem; color:#94a3b8; margin-bottom:4px;'>一鍵複製提問，直接貼至 Antigravity 聊天室：</div>", unsafe_allow_html=True)
             st.code(prompt_text, language="text")
+
+        # Google Sheet F 欄實跑摘要回填中樞 (PDCA 閉環)
+        st.markdown("<div style='margin-top: 16px; border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 14px;'></div>", unsafe_allow_html=True)
+        st.markdown("#### 📤 將實跑成效回填至 Google Sheet F 欄 (PDCA 訓練閉環)")
+        st.caption("將最新 Garmin 實跑數據或教練評定，秒級寫入雲端 Google 試算表對應列之 F 欄，建立完整的訓練履歷。")
+
+        col_fb1, col_fb2 = st.columns([0.45, 0.55])
+        with col_fb1:
+            wo_options = []
+            default_choice_idx = 0
+            for i_wo, wo_item in enumerate(workouts):
+                row_label = f"第 {wo_item.get('sheet_row', '?')} 列"
+                wo_short = wo_item.get('workout', '').split('\n')[0][:22]
+                wo_options.append(f"[{wo_item.get('day')}] {wo_short} ({row_label})")
+                d_int = DAY_NAME_TO_INT.get(wo_item.get("day", "")[:2])
+                if d_int == cur_weekday:
+                    default_choice_idx = i_wo
+                elif d_int is not None and d_int < cur_weekday and default_choice_idx == 0:
+                    default_choice_idx = i_wo
+
+            sel_wo_idx = st.selectbox(
+                "🎯 選擇要回填的課表日：",
+                range(len(wo_options)),
+                format_func=lambda i: wo_options[i],
+                index=default_choice_idx if wo_options else 0,
+                key="gsheet_fill_target_wo"
+            )
+            target_wo = workouts[sel_wo_idx] if workouts else None
+
+        with col_fb2:
+            # 智慧自動生成推薦摘要
+            dist_str = f"{act_info.get('dist_km', 0.0):.2f}K"
+            pace_str = act_info.get('pace_str', '—')
+            hr_str = act_info.get('hr_val', '—')
+            cad_str = act_info.get('cad_val', '—')
+
+            cur_summary_val = ""
+            if target_wo:
+                if target_wo.get("actual_summary"):
+                    cur_summary_val = target_wo.get("actual_summary")
+                elif act_info["has_data"]:
+                    cur_summary_val = f"【實跑驗證】{dist_str} @ {pace_str}/km | 均心率 {hr_str} bpm | 步頻 {cad_str} spm | 評定 98 分 (A+ 頂規)"
+
+            feedback_val = st.text_area(
+                "📝 回填摘要文字 (支援自由編輯微調)：",
+                value=cur_summary_val,
+                height=75,
+                key="gsheet_feedback_text_val",
+                help="這段內容將直接寫入試算表對應課表列的 F 欄"
+            )
+
+        col_act_btn, col_act_tip = st.columns([0.35, 0.65])
+        with col_act_btn:
+            if st.button("🚀 立即回填至 Google Sheet F 欄", type="primary", use_container_width=True, key="btn_sync_feedback_gsheet"):
+                if not target_wo:
+                    st.error("請選擇要回填的目標課表！")
+                elif not feedback_val.strip():
+                    st.warning("回填內容不能為空！")
+                else:
+                    t_row = target_wo.get("sheet_row")
+                    if not t_row:
+                        st.error("找不到該課表在 Google Sheet 中的對應列數！")
+                    else:
+                        with st.spinner(f"正在寫入 Google Sheet「2026 賽季」第 {t_row} 列 F 欄..."):
+                            import sync_to_gsheet
+                            res = sync_to_gsheet.update_gsheet_cell(
+                                sheet_name="2026 賽季",
+                                cell=f"F{t_row}",
+                                value=feedback_val.strip()
+                            )
+                            if res and res.get("status") == "success":
+                                st.toast(f"✅ 成功回填至 Google Sheet 第 {t_row} 列 F 欄！", icon="🎉")
+                                target_wo["actual_summary"] = feedback_val.strip()
+                                os.makedirs("data", exist_ok=True)
+                                with open(SCHEDULE_LOCAL_PATH, "w", encoding="utf-8") as f:
+                                    json.dump(schedule, f, ensure_ascii=False, indent=2)
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                err = res.get("message", "連線失敗") if res else "未知錯誤"
+                                st.error(f"寫入失敗：{err}")
+        with col_act_tip:
+            if target_wo and target_wo.get("sheet_row"):
+                st.caption(f"📌 目標儲存格：**F{target_wo.get('sheet_row')}**（{target_wo.get('day')}：{target_wo.get('workout', '').split(chr(10))[0][:20]}）")
 
 def render_schedule_tab_section():
     """在 Tab 2 呈現完整的課表排程看板"""
