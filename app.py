@@ -958,13 +958,44 @@ with st.sidebar:
                         st.session_state.base_z2_min = zones["z2_min"]
                         st.session_state.base_z2_max = zones["z2_max"]
                         st.session_state.base_source = f"Garmin 手錶動態分區 ({zones['sport']})"
+                    # 強制從 Garmin 雲端更新活動清單快取
+                    st.session_state.cloud_activities = garmin_cloud.fetch_recent_activities(limit=15, force_refresh=True)
+
                     fit_p, a_msg = garmin_cloud.fetch_and_save_latest_activity(client)
                     if fit_p and os.path.exists(fit_p):
                         df, summary, _, tags = process_data(fit_p)
                         st.session_state.df = df
                         st.session_state.pending_summary = summary
                         st.session_state.pending_tags = tags
-                        st.session_state.pending_file_name = a_msg
+                        act_id = a_msg.split("ID: ")[-1].replace(")", "").strip() if "ID: " in a_msg else ""
+                        ext_details = garmin_cloud.fetch_activity_details_ext(act_id) if act_id else {}
+                        st_info = {
+                            "begin": ext_details.get("begin_stamina", 100.0) if ext_details.get("begin_stamina") is not None else 100.0,
+                            "end": ext_details.get("end_stamina", 77.0) if ext_details.get("end_stamina") is not None else 77.0,
+                            "min": ext_details.get("min_stamina", 62.0) if ext_details.get("min_stamina") is not None else 62.0
+                        }
+                        st.session_state.active_ext_details = ext_details
+                        st.session_state.active_stamina = st_info
+                        act_display_name = a_msg.replace("已自動同步最新活動：", "").strip()
+                        st.session_state.pending_file_name = act_display_name
+                        st.session_state.active_loaded_id = act_id
+
+                        tot_d = df['dist_km'].sum() if 'dist_km' in df.columns else 0.0
+                        try:
+                            with open("data/active_activity.json", "w", encoding="utf-8") as f_act:
+                                json.dump({
+                                    "activity_id": act_id,
+                                    "name": act_display_name,
+                                    "date": datetime.now().strftime("%Y-%m-%d"),
+                                    "dist_km": round(tot_d, 2),
+                                    "fit_path": fit_p,
+                                    "stamina": st_info,
+                                    "te_label": ext_details.get("te_label", "AEROBIC_BASE"),
+                                    "ext": ext_details,
+                                    "updated_at": datetime.now().isoformat()
+                                }, f_act, ensure_ascii=False, indent=2)
+                        except Exception:
+                            pass
                     st.toast(f"✅ 晨檢與最新活動已同步！{a_msg if fit_p else ''}", icon="⚡")
                     st.rerun()
                 else:
@@ -1030,13 +1061,14 @@ with st.sidebar:
                         else:
                             st.error(f"下載失敗: {msg}")
             with col_c2:
-                if st.button("🔄 刷新", use_container_width=True, help="重新整理 Garmin 雲端活動清單"):
-                    st.session_state.cloud_activities = garmin_cloud.fetch_recent_activities(limit=15)
+                if st.button("🔄 刷新", use_container_width=True, help="強制重新整理 Garmin 雲端活動清單"):
+                    st.session_state.cloud_activities = garmin_cloud.fetch_recent_activities(limit=15, force_refresh=True)
+                    st.toast("✅ 已強制從 Garmin 雲端刷新最新活動清單！", icon="🔄")
                     st.rerun()
         else:
             st.info("尚無雲端跑步活動紀錄或連線逾時")
             if st.button("🔄 重試載入清單", use_container_width=True):
-                st.session_state.cloud_activities = garmin_cloud.fetch_recent_activities(limit=15)
+                st.session_state.cloud_activities = garmin_cloud.fetch_recent_activities(limit=15, force_refresh=True)
                 st.rerun()
     else:
         st.markdown("<span style='color: #f59e0b; font-size: 0.8rem; font-weight: bold;'>⚠️ 尚未綁定 Garmin 官方 API</span>", unsafe_allow_html=True)
