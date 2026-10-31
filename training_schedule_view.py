@@ -472,22 +472,23 @@ def render_sidebar_schedule_card():
         total_count = len(workouts)
         comp_badge = f"<span style='font-size: 0.68rem; background: rgba(16,185,129,0.25); color: #34d399; padding: 1px 5px; border-radius: 4px; font-weight: bold;'>{completed_count}/{total_count} 完成</span>" if completed_count > 0 else ""
 
-        st.markdown(f"""
-        <div style='background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9)); 
-                    border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;'>
-            <div style='display: flex; justify-content: space-between; align-items: center;'>
-                <span style='font-size: 0.85rem; font-weight: 700; color: #38bdf8;'>{curr_week['week_title']}</span>
-                <div style='display: flex; gap: 4px; align-items: center;'>
-                    {comp_badge}
-                    <span style='font-size: 0.7rem; background: rgba(56,189,248,0.15); color: #7dd3fc; padding: 2px 6px; border-radius: 4px;'>{curr_week['dates']}</span>
-                </div>
-            </div>
-            <div style='font-size: 0.78rem; color: #cbd5e1; margin-top: 4px; font-weight: 500;'>🎯 焦點：{curr_week['theme']}</div>
-            <div style='font-size: 0.75rem; color: #94a3b8; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px; line-height: 1.45;'>
-                {status_line}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        sidebar_card_html = (
+            f"<div style='background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9)); "
+            f"border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;'>"
+            f"<div style='display: flex; justify-content: space-between; align-items: center;'>"
+            f"<span style='font-size: 0.85rem; font-weight: 700; color: #38bdf8;'>{curr_week['week_title']}</span>"
+            f"<div style='display: flex; gap: 4px; align-items: center;'>"
+            f"{comp_badge}"
+            f"<span style='font-size: 0.7rem; background: rgba(56,189,248,0.15); color: #7dd3fc; padding: 2px 6px; border-radius: 4px;'>{curr_week['dates']}</span>"
+            f"</div>"
+            f"</div>"
+            f"<div style='font-size: 0.78rem; color: #cbd5e1; margin-top: 4px; font-weight: 500;'>🎯 焦點：{curr_week['theme']}</div>"
+            f"<div style='font-size: 0.75rem; color: #94a3b8; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px; line-height: 1.45;'>"
+            f"{status_line}"
+            f"</div>"
+            f"</div>"
+        )
+        st.markdown(sidebar_card_html, unsafe_allow_html=True)
 
     sheet_url, _ = get_gsheet_urls()
     if sheet_url:
@@ -530,12 +531,13 @@ def render_schedule_core_content(schedule):
     week_data = schedule[selected_idx]
 
     # 週次標題橫幅
-    st.markdown(f"""
-    <div style='background: rgba(30, 41, 59, 0.6); border-left: 4px solid #38bdf8; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px;'>
-        <div style='font-size: 1.1rem; font-weight: 700; color: #f8fafc;'>{week_data['week_title']} <span style='font-size: 0.85rem; color: #94a3b8; font-weight: 400;'>({week_data['dates']})</span></div>
-        <div style='font-size: 0.9rem; color: #38bdf8; margin-top: 2px;'>🎯 本週戰略主題：<strong>{week_data['theme']}</strong></div>
-    </div>
-    """, unsafe_allow_html=True)
+    week_banner_html = (
+        f"<div style='background: rgba(30, 41, 59, 0.6); border-left: 4px solid #38bdf8; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px;'>"
+        f"<div style='font-size: 1.1rem; font-weight: 700; color: #f8fafc;'>{week_data['week_title']} <span style='font-size: 0.85rem; color: #94a3b8; font-weight: 400;'>({week_data['dates']})</span></div>"
+        f"<div style='font-size: 0.9rem; color: #38bdf8; margin-top: 2px;'>🎯 本週戰略主題：<strong>{week_data['theme']}</strong></div>"
+        f"</div>"
+    )
+    st.markdown(week_banner_html, unsafe_allow_html=True)
 
     if st.session_state.get("gsheet_401_error", False):
         st.info("💡 **小提醒：** 您的 Google 試算表目前為私密狀態 (HTTP 401)。若希望在試算表上的直接手動修改能無縫串流回戰情室，可在試算表右上角「共用」將存取權設為「知道連結的任何人」皆可「檢視」。雙教練的所有自動微調與寫入皆已成功直連生效！")
