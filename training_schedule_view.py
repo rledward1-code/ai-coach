@@ -565,30 +565,28 @@ def render_schedule_core_content(schedule):
             items_html += f"<li style='margin-bottom: 4px;'><strong>{d_name} ({w_short})：</strong> {act_text}</li>"
 
         panel_title = "📜 歷史週次訓練回顧與執行覆盤" if is_past_week else "📜 本週實跑進度與執行回顧"
-        st.markdown(f"""
-        <div style='background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.85)); 
-                    border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;'>
-            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
-                <span style='font-size: 0.95rem; font-weight: 700; color: #34d399;'>
-                    {panel_title} (Training Retrospective)
-                </span>
-                <span style='font-size: 0.78rem; background: rgba(16, 185, 129, 0.25); color: #6ee7b7; padding: 2px 10px; border-radius: 12px; font-weight: 600;'>
-                    達成率：{len(completed_workouts)} / {total_workouts} 堂 ({completion_rate}%)
-                </span>
-            </div>
-            <ul style='font-size: 0.8rem; color: #cbd5e1; margin: 0; padding-left: 18px; line-height: 1.55;'>
-                {items_html}
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        retro_html = (
+            f"<div style='background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.85)); "
+            f"border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;'>"
+            f"<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>"
+            f"<span style='font-size: 0.95rem; font-weight: 700; color: #34d399;'>{panel_title} (Training Retrospective)</span>"
+            f"<span style='font-size: 0.78rem; background: rgba(16, 185, 129, 0.25); color: #6ee7b7; padding: 2px 10px; border-radius: 12px; font-weight: 600;'>"
+            f"達成率：{len(completed_workouts)} / {total_workouts} 堂 ({completion_rate}%)</span>"
+            f"</div>"
+            f"<ul style='font-size: 0.8rem; color: #cbd5e1; margin: 0; padding-left: 18px; line-height: 1.55;'>"
+            f"{items_html}"
+            f"</ul>"
+            f"</div>"
+        )
+        st.markdown(retro_html, unsafe_allow_html=True)
     elif is_past_week:
-        st.markdown(f"""
-        <div style='background: rgba(30, 41, 59, 0.5); border: 1px dashed rgba(148, 163, 184, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;'>
-            <span style='font-size: 0.82rem; color: #94a3b8;'>
-                ⏳ <strong>歷史前期課表檢閱</strong>：本週目前尚無 F 欄回填紀錄。您可在下方檢閱當時規劃之專項，或展開下方回填中樞進行歷史數據補充。
-            </span>
-        </div>
-        """, unsafe_allow_html=True)
+        empty_retro_html = (
+            f"<div style='background: rgba(30, 41, 59, 0.5); border: 1px dashed rgba(148, 163, 184, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;'>"
+            f"<span style='font-size: 0.82rem; color: #94a3b8;'>"
+            f"⏳ <strong>歷史前期課表檢閱</strong>：本週目前尚無 F 欄回填紀錄。您可在下方檢閱當時規劃之專項，或展開下方回填中樞進行歷史數據補充。"
+            f"</span></div>"
+        )
+        st.markdown(empty_retro_html, unsafe_allow_html=True)
 
     cols = st.columns(len(workouts)) if workouts else [st.container()]
     icon_map = {"週二": "🏃‍♂️", "週三": "🏃‍♂️", "週四": "⚡", "週六": "🔥", "週日": "🌊"}
@@ -634,33 +632,35 @@ def render_schedule_core_content(schedule):
             actual_summary = w.get("actual_summary", "")
             actual_html = ""
             if actual_summary:
-                actual_html = f"""
-                <div style='background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 6px; padding: 6px 8px; margin-top: 8px;'>
-                    <div style='font-size: 0.72rem; color: #34d399; font-weight: 700;'>📊 實跑驗證 (F 欄)：</div>
-                    <div style='font-size: 0.76rem; color: #e2e8f0; line-height: 1.35; white-space: pre-line;'>{actual_summary}</div>
-                </div>
-                """
+                clean_summary = actual_summary.replace(chr(10), "<br>")
+                actual_html = (
+                    f"<div style='background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 6px; padding: 6px 8px; margin-top: 8px;'>"
+                    f"<div style='font-size: 0.72rem; color: #34d399; font-weight: 700;'>📊 實跑驗證 (F 欄)：</div>"
+                    f"<div style='font-size: 0.76rem; color: #e2e8f0; line-height: 1.35;'>{clean_summary}</div>"
+                    f"</div>"
+                )
 
-            st.markdown(f"""
-            <div style='background: rgba(15, 23, 42, 0.7); {card_border} border-radius: 10px; padding: 12px 14px; min-height: 260px; height: 100%;'>
-                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
-                    <span style='font-weight: 700; font-size: 1.05rem; color: #f8fafc;'>{icon} {day}</span>
-                    {badge_html}
-                </div>
-                <div style='font-size: 0.82rem; color: #e2e8f0; line-height: 1.45; margin-bottom: 10px; min-height: 60px;'>
-                    {w.get("workout", "").replace(chr(10), "<br>")}
-                </div>
-                <div style='background: rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 8px; margin-bottom: 8px;'>
-                    <div style='font-size: 0.72rem; color: #94a3b8;'>🎯 目標配速：</div>
-                    <div style='font-size: 0.85rem; font-weight: 700; color: {accent};'>{w.get("pace", "—")}</div>
-                </div>
-                <div style='background: rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 8px;'>
-                    <div style='font-size: 0.72rem; color: #94a3b8;'>💓 生理/心率防線與技術：</div>
-                    <div style='font-size: 0.76rem; color: #cbd5e1; line-height: 1.35;'>{w.get("hr_note", "—")}</div>
-                </div>
-                {actual_html}
-            </div>
-            """, unsafe_allow_html=True)
+            card_html = (
+                f"<div style='background: rgba(15, 23, 42, 0.7); {card_border} border-radius: 10px; padding: 12px 14px; min-height: 260px; height: 100%;'>"
+                f"<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>"
+                f"<span style='font-weight: 700; font-size: 1.05rem; color: #f8fafc;'>{icon} {day}</span>"
+                f"{badge_html}"
+                f"</div>"
+                f"<div style='font-size: 0.82rem; color: #e2e8f0; line-height: 1.45; margin-bottom: 10px; min-height: 60px;'>"
+                f"{w.get('workout', '').replace(chr(10), '<br>')}"
+                f"</div>"
+                f"<div style='background: rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 8px; margin-bottom: 8px;'>"
+                f"<div style='font-size: 0.72rem; color: #94a3b8;'>🎯 目標配速：</div>"
+                f"<div style='font-size: 0.85rem; font-weight: 700; color: {accent};'>{w.get('pace', '—')}</div>"
+                f"</div>"
+                f"<div style='background: rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 8px;'>"
+                f"<div style='font-size: 0.72rem; color: #94a3b8;'>💓 生理/心率防線與技術：</div>"
+                f"<div style='font-size: 0.76rem; color: #cbd5e1; line-height: 1.35;'>{w.get('hr_note', '—')}</div>"
+                f"</div>"
+                f"{actual_html}"
+                f"</div>"
+            )
+            st.markdown(card_html, unsafe_allow_html=True)
 
     st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
 
