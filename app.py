@@ -12,6 +12,7 @@ AI Coach 運動科學戰情儀表板 (Sports Science Dashboard)
 import os
 import json
 import time
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import streamlit as st
