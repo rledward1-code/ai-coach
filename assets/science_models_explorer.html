@@ -87,14 +87,14 @@
           <span class="text-sm">⚧️</span>
           <span class="font-bold text-xs text-sky-200">生理性別 (Sex / Gender)</span>
         </div>
-        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">男 (Edward) / 女</span>
+        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">男性 ♂ / 女性 ♀</span>
       </div>
       <div id="node-age" onclick="selectNode('age')" onmouseenter="showTooltip(event, 'age')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
         <div class="flex items-center gap-2">
           <span class="text-sm">👤</span>
           <span class="font-bold text-xs text-sky-200">年齡 (Age)</span>
         </div>
-        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">45 歲</span>
+        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">40 歲</span>
       </div>
 
       <div id="node-rhr" onclick="selectNode('rhr')" onmouseenter="showTooltip(event, 'rhr')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
@@ -126,7 +126,7 @@
           <span class="text-sm">🏆</span>
           <span class="font-bold text-xs text-sky-200">近期實績 (Race PB)</span>
         </div>
-        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">半馬 2:01:08</span>
+        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">半馬 1:50:00</span>
       </div>
 
 
@@ -142,7 +142,7 @@
           <span class="text-sm">⛰️</span>
           <span class="font-bold text-xs text-sky-200">地形坡度 (Slope Grade)</span>
         </div>
-        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">社區 +6.0%</span>
+        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">丘陵 +5.0%</span>
       </div>
 
       <div id="node-hrv" onclick="selectNode('hrv')" onmouseenter="showTooltip(event, 'hrv')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
@@ -158,7 +158,7 @@
           <span class="text-sm">🏃</span>
           <span class="font-bold text-xs text-sky-200">步態力學 (Cadence/GCT)</span>
         </div>
-        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">187spm / 245ms</span>
+        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">182spm / 240ms</span>
       </div>
     </div>
 
@@ -232,7 +232,7 @@
       <div id="node-mp" onclick="selectNode('mp')" onmouseenter="showTooltip(event, 'mp')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-amber-500 transition-all-custom flex justify-between items-center">
         <div class="flex items-center gap-2">
           <span class="text-sm">🎯</span>
-          <span class="font-bold text-xs text-amber-200">台北馬 MP 目標配速</span>
+          <span class="font-bold text-xs text-amber-200">全馬 MP 目標配速</span>
         </div>
         <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">5:18～5:20 /km</span>
       </div>
@@ -355,25 +355,25 @@
         <div>
           <div class="flex justify-between text-slate-300 mb-0.5">
             <span>年齡 (Age)：</span>
-            <span id="val-age" class="text-sky-400 font-mono">45 歲</span>
+            <span id="val-age" class="text-sky-400 font-mono">40 歲</span>
           </div>
-          <input type="range" id="input-age" min="20" max="70" value="45" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
+          <input type="range" id="input-age" min="20" max="70" value="40" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
         </div>
 
         <div>
           <div class="flex justify-between text-slate-300 mb-0.5">
             <span>靜息心率 (RHR)：</span>
-            <span id="val-rhr" class="text-sky-400 font-mono">57 bpm</span>
+            <span id="val-rhr" class="text-sky-400 font-mono">55 bpm</span>
           </div>
-          <input type="range" id="input-rhr" min="40" max="80" value="57" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
+          <input type="range" id="input-rhr" min="40" max="80" value="55" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
         </div>
 
         <div>
           <div class="flex justify-between text-slate-300 mb-0.5">
             <span>最大心率 (Max HR)：</span>
-            <span id="val-maxhr" class="text-sky-400 font-mono">200 bpm</span>
+            <span id="val-maxhr" class="text-sky-400 font-mono">195 bpm</span>
           </div>
-          <input type="range" id="input-maxhr" min="165" max="215" value="200" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
+          <input type="range" id="input-maxhr" min="165" max="215" value="195" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
         </div>
       </div>
 
@@ -392,25 +392,25 @@
         <div>
           <div class="flex justify-between text-slate-300 mb-0.5">
             <span>半馬成績 (HM PB)：</span>
-            <span id="val-hm" class="text-sky-400 font-mono">2:01:08</span>
+            <span id="val-hm" class="text-sky-400 font-mono">1:50:00</span>
           </div>
-          <input type="range" id="input-hm" min="80" max="160" value="121" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
+          <input type="range" id="input-hm" min="80" max="160" value="110" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
         </div>
 
         <div>
           <div class="flex justify-between text-slate-300 mb-0.5">
             <span>坡度 (Slope)：</span>
-            <span id="val-slope" class="text-sky-400 font-mono">+6.0%</span>
+            <span id="val-slope" class="text-sky-400 font-mono">+5.0%</span>
           </div>
-          <input type="range" id="input-slope" min="-8" max="15" value="6" step="0.5" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
+          <input type="range" id="input-slope" min="-8" max="15" value="5" step="0.5" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
         </div>
 
         <div>
           <div class="flex justify-between text-slate-300 mb-0.5">
             <span>實跑配速 (Pace)：</span>
-            <span id="val-pace" class="text-sky-400 font-mono">7:15 /km</span>
+            <span id="val-pace" class="text-sky-400 font-mono">6:00 /km</span>
           </div>
-          <input type="range" id="input-pace" min="300" max="500" value="435" step="5" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
+          <input type="range" id="input-pace" min="300" max="500" value="360" step="5" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
         </div>
       </div>
 
@@ -474,7 +474,7 @@
   "age": {
     "title": "年齡 (Age) 生理影響模型",
     "icon": "👤",
-    "badge": "45 歲",
+    "badge": "40 歲",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
@@ -498,7 +498,7 @@
   "rhr": {
     "title": "晨脈 / 靜止心率 (Rest HR) 恢復基線",
     "icon": "💓",
-    "badge": "53～56 bpm",
+    "badge": "50～55 bpm",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
@@ -507,7 +507,7 @@
       "z2zone",
       "pmcout"
     ],
-    "mechanism": "靜止晨脈是自律神經與心血管恢復狀態的最敏銳晴雨表。若晨脈較基準線高出 5+ bpm（如 10/31 飆至 63 bpm），代表交感神經亢奮或心肌搏出量未完全修復；晨脈回降至 57 bpm 則代表超量恢復達成。",
+    "mechanism": "靜止晨脈是自律神經與心血管恢復狀態的最敏銳晴雨表。若晨脈較個人基準線高出 5+ bpm（例如由常態 52 bpm 升至 58 bpm），代表交感神經亢奮或心血管尚未完全修復；晨脈回落至常態則代表超量恢復達成。",
     "formula": "HR_reserve = Max_HR - Rest_HR\nZone2_Lower = Rest_HR + 0.60 × HR_reserve",
     "links": [
       {
@@ -523,7 +523,7 @@
   "maxhr": {
     "title": "個人最大心率 (Max HR) 天花板",
     "icon": "🔥",
-    "badge": "200～210 bpm",
+    "badge": "190～200 bpm",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
@@ -531,7 +531,7 @@
       "banister",
       "z2zone"
     ],
-    "mechanism": "Edward 實測極限心率可達 200~210 bpm（高於同齡平均 175 bpm），代表擁有極大有氧動力儲備 (Cardiovascular Reserve)。若誤用傳統 220-年齡 公式，會導致各訓練區間嚴重低估，喪失高強度神經刺激與訓練效益。",
+    "mechanism": "當進階耐力跑者實測極限心率達 190~200 bpm（若高於同齡平均 175 bpm），代表擁有較大有氧動力儲備 (Cardiovascular Reserve)。若誤用傳統 220-年齡 粗略公式，會導致各訓練區間被嚴重低估，喪失適當的神經刺激與訓練效益。",
     "formula": "ΔHRratio = (HR_ex - Rest_HR) / (Max_HR - Rest_HR)",
     "links": [
       {
@@ -547,7 +547,7 @@
   "lthr": {
     "title": "乳酸閾值心率 (LTHR) 能量分界",
     "icon": "⚡",
-    "badge": "184～193 bpm",
+    "badge": "175～185 bpm",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
@@ -557,7 +557,7 @@
       "z2zone",
       "mp"
     ],
-    "mechanism": "乳酸閾值代表血液乳酸濃度達到平衡（約 4.0 mmol/L）的最大強度。神聖 Zone 2 的上限由 LTHR × 85%~89% 嚴格錨定（Edward 為 163~165 bpm），一旦突破此防線，體能消耗即由脂肪氧化切換為高耗能的糖原酵解。",
+    "mechanism": "乳酸閾值代表血液乳酸濃度達到動態平衡（約 4.0 mmol/L）的最大強度。神聖 Zone 2 的上限由 LTHR × 85%~89% 嚴格錨定（例如範例跑者為 158~164 bpm），一旦突破此防線，體能消耗即由脂肪氧化切換為高耗能的糖原酵解。",
     "formula": "Zone2_Ceiling = LTHR × 0.89\nZone4_Threshold = LTHR × 1.00 ± 2%",
     "links": [
       {
@@ -584,7 +584,7 @@
       "mp",
       "pred"
     ],
-    "mechanism": "馬拉松最佳競賽氣溫為 10°C~15°C。當環境氣溫升高（如長榮半馬 27°C 烈日 vs 台北馬預期 15°C 黃金低溫），人體為了維持核心體溫，會將大量心輸出量分流至皮下微血管進行排汗散熱，導致骨骼肌有效血流減少，引發顯著的心血管漂移（心率上升 5~15 bpm）與能效比 (EF) 折損。權威文獻證實：氣溫每高於 15°C 1°C，馬拉松完賽配速平均折損約 0.3%~0.5%。",
+    "mechanism": "馬拉松最佳競賽氣溫為 10°C~15°C。當環境氣溫升高（例如夏季炎熱賽事 27°C vs 秋冬季理想賽事 15°C 最適溫），人體為了維持核心體溫，會將大量心輸出量分流至皮下微血管進行排汗散熱，導致骨骼肌有效血流減少，引發顯著的心血管漂移（心率上升 5~15 bpm）與能效比 (EF) 折損。權威文獻證實：氣溫每高於 15°C 1°C，馬拉松完賽配速平均折損約 0.3%~0.5%。",
     "formula": "Pace_Penalty = max(0, (Temp - 15) × 0.4%)\nΔHR_Drift = max(0, (Temp - 15) × 1.2 bpm)\nT_adjusted = T_riegel × (1 + Pace_Penalty)",
     "links": [
       {
@@ -604,7 +604,7 @@
   "pb": {
     "title": "賽事實績 (Race PB) 跑力錨定點",
     "icon": "🏆",
-    "badge": "半馬 2:01:08",
+    "badge": "半馬 1:50:00",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
@@ -613,7 +613,7 @@
       "mp",
       "pred"
     ],
-    "mechanism": "實際比賽成就是消除所有實驗室理論誤差的最真實依據。長榮半馬 2:01:08 成績餵入後，系統可自動精準推導出當前真實 VDOT 跑力，並使用 Riegel 冪定律推演台北馬 Sub-3:45 戰略。",
+    "mechanism": "實際比賽成績是消除實驗室理論推估誤差的最真實依據。餵入近期半馬實績（例如 1:50:00）後，系統可自動精準推導出當前真實 VDOT 跑力，並使用 Riegel 冪定律推演出目標大賽全馬配速與完賽戰略。",
     "formula": "T_full = T_half × (42.195 / 21.0975)^1.06",
     "links": [
       {
@@ -629,14 +629,14 @@
   "slope": {
     "title": "地形坡度與爬升 (Grade & Ascent)",
     "icon": "⛰️",
-    "badge": "社區 +6.0%",
+    "badge": "丘陵 +5.0%",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
       "minetti",
       "gapout"
     ],
-    "mechanism": "社區環線單圈爬升 25 公尺、均坡 6%，人體對抗重力需要額外招募快縮肌纖維推蹬。Minetti 方程式計算出上坡每增加 1% 坡度，每公斤每公尺能耗增加約 1.5 焦耳，說明了社區上坡心率飆升是天然肌力訓練。",
+    "mechanism": "起伏路段單圈爬升 25 公尺、均坡 5%，人體對抗重力需要額外招募快縮肌纖維推蹬。Minetti 方程式計算出上坡每增加 1% 坡度，每公斤每公尺能耗增加約 1.5 焦耳，說明了上坡心率飆升是天然肌力做功訓練。",
     "formula": "C_r = 155.4·i⁵ - 30.4·i⁴ - 32.8·i³ + 43.1·i² + 21.5·i + 3.6",
     "links": [
       {
@@ -648,14 +648,14 @@
   "hrv": {
     "title": "夜間 HRV (rMSSD) 與自律神經狀態",
     "icon": "🌙",
-    "badge": "32～39 ms",
+    "badge": "35～45 ms",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
       "plews",
       "stop閥"
     ],
-    "mechanism": "HRV (心率變異度) 反映副交感神經對心跳間隔的調節能力。當長榮賽後或衝刺課表後神經疲勞時，HRV 下降（如跌至 30ms），系統會主動建議「降階為 Zone 1 輕慢跑」或啟動 7K 安全折返。",
+    "mechanism": "HRV (心率變異度) 反映副交感神經對心跳間隔的調節能力。當全開賽事或高強度衝刺課表後神經疲勞時，HRV 下降（例如跌至 30ms 以下），系統會主動建議「降階為 Zone 1 輕慢跑」或啟動提早折返修復。",
     "formula": "rMSSD = sqrt( (1/(N-1)) · ∑(RR_{i+1} - RR_i)² )",
     "links": [
       {
@@ -671,7 +671,7 @@
   "gait": {
     "title": "步態動力學 (Cadence, GCT, VO)",
     "icon": "🏃",
-    "badge": "187spm / 245ms",
+    "badge": "182spm / 240ms",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
@@ -679,7 +679,7 @@
       "stamina",
       "gsheetout"
     ],
-    "mechanism": "步頻 (187 spm)、觸地時間 (245 ms) 與左右平衡 (49.7:50.3) 反映下肢彈簧剛性與跑步經濟性。當疲勞累積時，GCT 會拉長至 260ms 以上、步頻下降，能量浪費在煞車衝擊中。",
+    "mechanism": "步頻 (180~186 spm)、觸地時間 (235~245 ms) 與左右平衡 (50:50) 反映下肢彈簧剛性與跑步經濟性。當疲勞累積時，GCT 會拉長至 260ms 以上、步頻下降，能量浪費在煞車衝擊中。",
     "formula": "Speed = Cadence × Stride_Length\nImpact_Load = ∑(Work × GCT)",
     "links": [
       {
@@ -707,7 +707,7 @@
     "downstream": [
       "z2zone"
     ],
-    "mechanism": "排除一般公式忽略靜息心率的缺陷，採用「儲備心率 (HRR)」依據真實血管動態劃分 Zone 1~5。路格教練將 Zone 2 定義在 149~165 bpm，是全馬燃脂與粒線體增生的最有效金牌區間。",
+    "mechanism": "排除一般公式忽略靜息心率的缺陷，採用「儲備心率 (HRR)」依據真實血管動態劃分 Zone 1~5。路格教練將 Zone 2 定義在 60%~75% HRR，是全馬燃脂與粒線體增生的最有效金牌區間。",
     "formula": "HR_target = Rest_HR + (Max_HR - Rest_HR) × Intensity%\nZone 2: 60%~75% HRR (神聖鎖定)",
     "links": [
       {
@@ -754,7 +754,7 @@
     "downstream": [
       "pred"
     ],
-    "mechanism": "工程師 Peter Riegel 於 1981 年提出的耐力衰減冪定律。假設人體隨著運動距離加倍，速度會因肌肉疲勞與能量枯竭衰減約 6% ($b=1.06$)。本系統納入溫度熱折損補償，用以精準推算台北馬拉松 Sub-3:45 的可行性。",
+    "mechanism": "工程師 Peter Riegel 於 1981 年提出的耐力衰減冪定律。假設人體隨著運動距離加倍，速度會因肌肉疲勞與能量枯竭衰減約 6% ($b=1.06$)。本系統納入溫度熱折損補償，用以精準推算目標大賽完賽時間可行性。",
     "formula": "T2 = T1 × (D2 / D1)^1.06 × (1 + Temp_Penalty)",
     "links": [
       {
@@ -832,7 +832,7 @@
       "stop閥",
       "gsheetout"
     ],
-    "mechanism": "Joe Friel 提出的心血管穩態檢測法。在等速平坦長跑中，比較前半程與後半程的「心率 vs 速度」比值。若後半程心率飄升超過 5%，代表脫水、體溫過高或慢縮肌衰退，心血管已產生脫鉤。11/01 16K 之 +2bpm 為近乎零漂移。",
+    "mechanism": "Joe Friel 提出的心血管穩態檢測法。在等速平坦長跑中，比較前半程與後半程的「心率 vs 速度」比值。若後半程心率飄升超過 5%，代表脫水、體溫過高或慢縮肌衰退，心血管已產生脫鉤；高水準長跑後半程飄升 < 2 bpm 即為近乎零漂移。",
     "formula": "Decoupling % = (EF_first - EF_second) / EF_first × 100%\n判定標準：< 5% 卓越",
     "links": [
       {
@@ -901,7 +901,7 @@
   "z2zone": {
     "title": "神聖 Zone 2 心率防線 (149～165 bpm)",
     "icon": "🛡️",
-    "badge": "149～165 bpm",
+    "badge": "145～162 bpm",
     "category": "戰術輸出與賽事推演",
     "upstream": [
       "karvonen",
@@ -913,8 +913,8 @@
     "downstream": [
       "gsheetout"
     ],
-    "mechanism": "路格教練反覆強調的「神聖有氧防線」。下限 149 bpm 確保足夠心肌搏出量與粒線體刺激，上限 165 bpm 嚴格封鎖乳酸累積。11/01 16K 全程均心率守在 162 bpm，完全展現了極致的生理自律。",
-    "formula": "Zone 2 Lower = 149 bpm (60% HRR)\nZone 2 Upper = 165 bpm (85% LTHR)",
+    "mechanism": "路格教練反覆強調的「神聖有氧防線」。下限確保足夠心肌搏出量與粒線體刺激，上限嚴格封鎖乳酸累積。在長距離巡航中全程均心率守在此區間，展現極致的生理自律與脂肪供能效率。",
+    "formula": "Zone 2 Lower = Rest_HR + 0.60 × HRR\nZone 2 Upper = LTHR × 0.88",
     "links": [
       {
         "text": "Seiler, S. (2010). What is best practice for training intensity and duration distribution in endurance athletes? Int J Sports Physiol Perform, 5(3), 276-291.",
@@ -929,7 +929,7 @@
   "mp": {
     "title": "馬拉松目標配速 (Marathon Pace MP)",
     "icon": "🎯",
-    "badge": "5:15～5:20",
+    "badge": "5:20～5:25",
     "category": "戰術輸出與賽事推演",
     "upstream": [
       "daniels",
@@ -940,7 +940,7 @@
       "pred",
       "gsheetout"
     ],
-    "mechanism": "台北馬拉松衝擊個人 PB (Sub-3:45) 的核心節奏。在 15°C 最適溫平坦河堤路段，維持 184~187 步頻、觸地時間 245ms，以每公里 5:15~5:20 的能效最佳巡航配速推進。",
+    "mechanism": "目標大賽衝擊個人 PB 的核心巡航節奏。在 15°C 最適溫平坦路段，維持 182~186 步頻、觸地時間約 240ms，以每公里 5:20~5:25 的最佳能效巡航配速推進。",
     "formula": "MP = VDOT_Pace × Flat_Efficiency_Ratio × Temp_Factor",
     "links": [
       {
@@ -956,7 +956,7 @@
   "pred": {
     "title": "大賽完賽時間沙盤推演 (Race Prediction)",
     "icon": "⏱️",
-    "badge": "台北馬 Sub-3:45",
+    "badge": "全馬 Sub-3:50",
     "category": "戰術輸出與賽事推演",
     "upstream": [
       "riegel",
@@ -967,7 +967,7 @@
     "downstream": [
       "gsheetout"
     ],
-    "mechanism": "綜合長榮半馬 2:01:08（27°C 高溫）實績，經氣溫校正（+4.8% 熱折損回補）與 Riegel 冪定律推估：台北馬（15°C 低溫）完賽時間鎖定在 3小時42分～3小時45分，具備極高達成勝率！",
+    "mechanism": "綜合近期半馬 1:50:00 實績，經氣溫校正（高溫折損回補）與 Riegel 冪定律推演：秋冬目標大賽（15°C 最適溫）完賽時間鎖定在 3小時48分～3小時52分，具備極高達成勝率！",
     "formula": "T_Predicted = T_HM × (42.195 / 21.0975)^1.058 × Temp_Correction",
     "links": [
       {
@@ -983,7 +983,7 @@
   "gapout": {
     "title": "等效平地配速 GAP (社區 vs 平地河堤)",
     "icon": "⚡",
-    "badge": "6:24 ➡️ 5:39 GAP",
+    "badge": "6:15 ➡️ 5:35 GAP",
     "category": "戰術輸出與賽事推演",
     "upstream": [
       "minetti",
@@ -992,7 +992,7 @@
     "downstream": [
       "gsheetout"
     ],
-    "mechanism": "消除地心引力坡度干擾的真實做功能力指標。11/01 社區長跑 16K 實測 6:24 /km，換算等效平地河堤配速相當於 5:39 /km，第 16 公里衝刺甚至達 5:02 GAP，證實平路巡航戰力超群。",
+    "mechanism": "消除地心引力坡度干擾的真實做功能力指標。起伏路線長跑實測 6:15 /km，換算等效平地路段配速相當於 5:35 /km，末段衝刺甚至達 4:58 GAP，證實平路巡航戰力強韌。",
     "formula": "GAP_sec = Pace_sec / (Cost_Slope / Cost_Flat)",
     "links": [
       {
@@ -1008,7 +1008,7 @@
   "pmcout": {
     "title": "PMC 體能管理 (CTL/ATL/TSB 就緒指數)",
     "icon": "🔋",
-    "badge": "Form +8.4 巔峰",
+    "badge": "Form +5.0 充沛",
     "category": "戰術輸出與賽事推演",
     "upstream": [
       "banister",
@@ -1017,7 +1017,7 @@
     "downstream": [
       "gsheetout"
     ],
-    "mechanism": "滾動監控長期體能 (CTL)、短期疲勞 (ATL) 與競技狀態 (TSB)。長榮半馬大衝擊後 ATL 升高，但透過週三 Zone 1 排酸與週五充分休息，TSB 回升至 +8.4 甜蜜點，完全具備執行 16K 的體能就緒度。",
+    "mechanism": "滾動監控長期體能 (CTL)、短期疲勞 (ATL) 與競技狀態 (TSB)。全開大賽後 ATL 升高，但透過主動排酸與充分休整，TSB 回升至正值甜蜜點，即具備執行高負荷長跑的就緒度。",
     "formula": "TSB = CTL - ATL (最佳競技窗口: -10 ~ +15)",
     "links": [
       {
@@ -1043,7 +1043,7 @@
     "downstream": [
       "gsheetout"
     ],
-    "mechanism": "雙教練安全保護機制：當前日晨脈高於 60 bpm 或 HRV 偏低時，自動啟動「7K 檢驗閥」。若 7 公里時心率突破 163 bpm 或左右平衡嚴重失衡（> 51:49），即刻發出終止長跑警告，改為快走折返。",
+    "mechanism": "雙教練安全保護機制：當前日晨脈偏高或 HRV 低落時，自動啟動「安全檢驗閥」。若行進中心率飄破上限或左右平衡嚴重失衡（> 51:49），即刻發出終止長跑警告，改為快走折返。",
     "formula": "IF (HR_7k > 163 || Balance_skew > 1.5%) -> ABORT_TO_WALK",
     "links": [
       {
@@ -1059,7 +1059,7 @@
   "stamout": {
     "title": "Stamina 完賽剩餘體力與骨骼衝擊負荷",
     "icon": "📊",
-    "badge": "剩餘 56% 頂規",
+    "badge": "剩餘 55% 充沛",
     "category": "戰術輸出與賽事推演",
     "upstream": [
       "stamina"
@@ -1067,7 +1067,7 @@
     "downstream": [
       "gsheetout"
     ],
-    "mechanism": "11/01 跑完 16K 長距離後，體能剩餘 56%（總耗損僅 44%），骨骼衝擊負荷約 1,940，證明以 162 bpm 有氧巡航對肌糖原消耗極為節省，無撞牆風險，恢復時間可大幅縮短至 24 小時以內。",
+    "mechanism": "長跑結束後，體能剩餘 50% 以上（總耗損低於 50%），骨骼衝擊負荷控制在安全閾值內，證明在 Zone 2 有氧巡航對肌糖原消耗極為節省，無撞牆風險，恢復時間大幅縮短。",
     "formula": "Impact_Load = Total_Steps × Avg_GCT_ms × Weight_kg / 1000",
     "links": [
       {
@@ -1083,7 +1083,7 @@
   "gsheetout": {
     "title": "Google Sheet 雲端課表自動評分與回填",
     "icon": "📋",
-    "badge": "F欄 99分 A+ 頂規",
+    "badge": "課表 98分 A+ 頂規",
     "category": "戰術輸出與賽事推演",
     "upstream": [
       "gait",
@@ -1098,7 +1098,7 @@
       "stamout"
     ],
     "downstream": [],
-    "mechanism": "將所有生理指標（均心率 162、步頻 187、左右 49.7:50.3、無心率漂移）自動彙整，綜合判定 99 分（A+ 頂規突破），並透過 Webhook 自動回填試算表 F17 欄位，標記「週日 實跑已驗證」綠燈！",
+    "mechanism": "將全趟生理指標（均心率、步頻、左右平衡、心率漂移度）自動彙整評分（如 A+ 頂規驗證），並透過 Webhook 自動回填雲端課表，點亮「實跑已驗證」進度綠燈！",
     "formula": "Score = Base(100) - HR_Penalty - Decouple_Penalty - Asymmetry_Penalty",
     "links": [
       {
@@ -1114,7 +1114,7 @@
   "sex": {
     "title": "生理性別 (Biological Sex) 代謝與負荷權重",
     "icon": "⚧️",
-    "badge": "男 (Edward) / 女",
+    "badge": "男性 ♂ / 女性 ♀",
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
@@ -1152,7 +1152,7 @@
       if (s === 'm') {
         if (btnM) { btnM.className = 'flex-1 py-1 rounded bg-sky-600 text-white font-bold text-xs border border-sky-400 transition-colors'; }
         if (btnF) { btnF.className = 'flex-1 py-1 rounded bg-slate-800 text-slate-300 text-xs border border-slate-700 hover:bg-slate-700 transition-colors'; }
-        if (valSex) { valSex.textContent = '男性 ♂ (Edward)'; valSex.className = 'text-sky-400 font-mono'; }
+        if (valSex) { valSex.textContent = '男性 ♂'; valSex.className = 'text-sky-400 font-mono'; }
       } else {
         if (btnM) { btnM.className = 'flex-1 py-1 rounded bg-slate-800 text-slate-300 text-xs border border-slate-700 hover:bg-slate-700 transition-colors'; }
         if (btnF) { btnF.className = 'flex-1 py-1 rounded bg-pink-600 text-white font-bold text-xs border border-pink-400 transition-colors'; }
@@ -1309,17 +1309,17 @@
     // 🧮 動態參數連動計算
     function recalculate() {
       const isFemale = currentSex === 'f';
-      const age = parseInt(document.getElementById('input-age') ? document.getElementById('input-age').value : 45);
+      const age = parseInt(document.getElementById('input-age') ? document.getElementById('input-age').value : 40);
       if (document.getElementById('calc-trimp-coeff')) {
         document.getElementById('calc-trimp-coeff').textContent = isFemale ? 'b=1.67 (女, 0.86e^1.67x)' : 'b=1.92 (男, 0.64e^1.92x)';
         document.getElementById('calc-trimp-coeff').className = isFemale ? 'font-bold text-pink-400 font-mono' : 'font-bold text-sky-400 font-mono';
       }
-      const rhr = parseInt(document.getElementById('input-rhr') ? document.getElementById('input-rhr').value : 57);
-      const maxhr = parseInt(document.getElementById('input-maxhr') ? document.getElementById('input-maxhr').value : 200);
+      const rhr = parseInt(document.getElementById('input-rhr') ? document.getElementById('input-rhr').value : 55);
+      const maxhr = parseInt(document.getElementById('input-maxhr') ? document.getElementById('input-maxhr').value : 195);
       const temp = parseInt(document.getElementById('input-temp') ? document.getElementById('input-temp').value : 15);
-      const hmMinutes = parseInt(document.getElementById('input-hm') ? document.getElementById('input-hm').value : 121);
-      const slope = parseFloat(document.getElementById('input-slope') ? document.getElementById('input-slope').value : 6);
-      const paceSec = parseInt(document.getElementById('input-pace') ? document.getElementById('input-pace').value : 435);
+      const hmMinutes = parseInt(document.getElementById('input-hm') ? document.getElementById('input-hm').value : 110);
+      const slope = parseFloat(document.getElementById('input-slope') ? document.getElementById('input-slope').value : 5);
+      const paceSec = parseInt(document.getElementById('input-pace') ? document.getElementById('input-pace').value : 360);
 
       if (document.getElementById('val-age')) document.getElementById('val-age').textContent = age + ' 歲';
       if (document.getElementById('val-rhr')) document.getElementById('val-rhr').textContent = rhr + ' bpm';
