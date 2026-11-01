@@ -19,6 +19,12 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import textwrap
+
+def render_html(html_str: str):
+    '''安全渲染 HTML，防止 CommonMark 縮排導致程式碼區塊解析錯誤'''
+    st.markdown(textwrap.dedent(html_str).strip(), unsafe_allow_html=True)
+
 
 import data_processor
 
@@ -51,7 +57,7 @@ st.set_page_config(
 if "initial_loaded" not in st.session_state:
     startup_box = st.empty()
     with startup_box.container():
-        st.markdown("""
+        render_html("""
         <div style='background: linear-gradient(135deg, rgba(15,23,42,0.92), rgba(30,41,59,0.95)); 
                     border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 14px 18px; margin-bottom: 14px;
                     box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(8px);'>
@@ -63,7 +69,7 @@ if "initial_loaded" not in st.session_state:
                 正在載入生理神經模型、雙賽季 25 週課表與動力學分析模組...
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
         init_bar = st.progress(25, text="📊 [25%] 快速載入個人生理基線 (Max HR 210 / LTHR 193 / Zone 2)...")
         time.sleep(0.08)
         init_bar.progress(55, text="📅 [55%] 讀取 25 週雙馬連動課表 (台北馬 ➡️ 萬金石)...")
@@ -76,7 +82,7 @@ if "initial_loaded" not in st.session_state:
     st.session_state.initial_loaded = True
 
 # --- 2. 樣式優化 (CSS) ---
-st.markdown("""
+render_html("""
 <style>
 /* 1. 頂部 Header 保持透明極簡，隱藏 Deploy 按鈕與裝飾條，保留收合與展開按鈕 */
 header[data-testid="stHeader"],
@@ -240,7 +246,7 @@ button[data-baseweb="tab"] {
     box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6) !important;
 }
 </style>
-""", unsafe_allow_html=True)
+""")
 
 # --- 3. 讀取設定與跑者設定檔 ---
 KEYS_FILE = "keys.json"
@@ -627,12 +633,12 @@ def open_profile_dialog():
         2. 登入您的 Garmin 帳號，點擊 **「產生權杖 (Generate Token)」**
         3. 複製以 `GCDC_` 開頭的金鑰字串並貼入下方欄位。
         """)
-        st.markdown("""
+        render_html("""
         <div style='background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; padding: 8px 12px; border-radius: 4px; font-size: 0.8rem; color: #a7f3d0; margin-bottom: 10px;'>
             🛡️ <strong>本機隱私安全聲明 (Local-Only Privacy)</strong>：<br>
             您的 Garmin API Token <strong>僅保存在本機檔案中 (Local Storage)</strong>，絕不上傳任何第三方雲端或外部伺服器。所有連線均由您的瀏覽器/電腦直接向 Garmin 官方伺服器 (<code>connectapi.garmin.com</code>) 發起請求，隱私 100% 自主掌控。
         </div>
-        """, unsafe_allow_html=True)
+        """)
         has_token = garmin_cloud.has_valid_token()
         if has_token:
             st.success("🔒 **系統狀態：已綁定有效 Garmin Token (安全隱藏保護)**")
@@ -672,11 +678,11 @@ def open_profile_dialog():
                 pass
 
         st.markdown("<div style='font-size:0.85rem; color:#94a3b8; margin-bottom: 6px;'>連動個人 8 週課表 Google 試算表：</div>", unsafe_allow_html=True)
-        st.markdown("""
+        render_html("""
         <div style='background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; padding: 8px 12px; border-radius: 4px; font-size: 0.8rem; color: #bae6fd; margin-bottom: 12px;'>
             💡 <strong>智慧解析</strong>：直接貼上瀏覽器中的 Google 試算表網址，系統會自動解析並推導即時 CSV 串流，完全無需手動拼湊匯出參數！
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
         in_sheet_url = st.text_input(
             "Google 試算表瀏覽網址 (Sheet URL)",
@@ -697,7 +703,7 @@ def open_profile_dialog():
         )
 
         with st.expander("📖 如何建立您專屬的 Google Apps Script Webhook？(點擊展開 3 步驟與範例代碼)", expanded=False):
-            st.markdown("""
+            render_html("""
             **雙向回寫同步 Webhook** 能讓 Antigravity 雙教練或系統自動為您調整課表、寫入最新賽事實績至試算表。
 
             **🛠️ 3 分鐘架設步驟：**
@@ -1262,12 +1268,12 @@ col_h_left, col_h_right = st.columns([0.7, 0.3])
 with col_h_left:
     st.title("🏃 AI Coach 運動科學戰情看板")
 with col_h_right:
-    st.markdown("""
+    render_html("""
     <div style='background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 8px; padding: 8px 12px; font-size: 0.8rem;'>
         🤖 <strong>雙教練外腦已啟動：</strong><br>
         直接在 Antigravity 聊天室發問，享受頂級推理與動態會診！
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 # 身分認證與隱私防護徽章
 auth_manager.render_auth_badge()
@@ -1450,7 +1456,7 @@ with tab_pmc:
             luger_rec = f"⚠️ 警報！HRV 處於 {hrv_tag} ({mock_hrv_val} ms) 且晨脈高達 {mock_rhr} bpm，若強行吃課表極易引發阿基里斯腱發炎或免疫低下！"
             pace_rec = "強制煞車：今日取消強度課表，改為 Zone 2 慢跑 30 分鐘，或直接休跑以滾筒伸展。"
 
-        st.markdown(f"""
+        render_html(f"""
         <div style='background: rgba(15,23,42,0.85); padding: 16px; border-radius: 12px; border: 1px solid {status_color}; height: 100%; display: flex; flex-direction: column; justify-content: space-between;'>
             <div>
                 <div style='display: flex; justify-content: space-between; align-items: center;'>
@@ -1466,7 +1472,7 @@ with tab_pmc:
                 <p style='margin: 0; color: #93c5fd;'>⚡ <strong>佩絲教練：</strong>{pace_rec}</p>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     # --- 1.5 昨夜深層睡眠結構與全天身心抗壓儀表 ---
     r_cache = st.session_state.get("synced_readiness_full", load_cached_readiness())
@@ -1484,7 +1490,7 @@ with tab_pmc:
     c_sleep, c_stress = st.columns([0.54, 0.46])
     with c_sleep:
         with st.container(border=True):
-            st.markdown(f"""
+            render_html(f"""
             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
                 <span style='font-size: 0.95rem; font-weight: 700; color: #f8fafc;'>🌙 睡眠分期與深層神經修復架構</span>
                 <span style='font-size: 0.72rem; background: rgba(16,185,129,0.15); color: #10b981; padding: 2px 8px; border-radius: 4px; font-weight: bold;'>評級：{d_deep_q}</span>
@@ -1508,10 +1514,10 @@ with tab_pmc:
                     <div style='color: #94a3b8; font-size: 0.68rem;'>⚪ 淺層睡眠</div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
     with c_stress:
         with st.container(border=True):
-            st.markdown(f"""
+            render_html(f"""
             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
                 <span style='font-size: 0.95rem; font-weight: 700; color: #f8fafc;'>🧘 全天抗壓指數與代謝</span>
                 <span style='font-size: 0.72rem; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-weight: bold;'>狀態：{d_stress_q}</span>
@@ -1528,7 +1534,7 @@ with tab_pmc:
                     <div style='font-size: 0.68rem; color: #64748b; margin-top: 2px;'>呼吸平穩無發炎</div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
 
     st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
 
@@ -1715,13 +1721,13 @@ with tab_pmc:
     if diagnosis_text:
         bg_col = "rgba(16, 185, 129, 0.12)" if diag_level == "success" else ("rgba(245, 158, 11, 0.12)" if diag_level == "warning" else ("rgba(239, 68, 68, 0.15)" if diag_level == "danger" else "rgba(59, 130, 246, 0.12)"))
         border_col = "#10b981" if diag_level == "success" else ("#f59e0b" if diag_level == "warning" else ("#ef4444" if diag_level == "danger" else "#3b82f6"))
-        st.markdown(f"""
+        render_html(f"""
         <div style='background:{bg_col}; border-left: 4px solid {border_col}; border-radius: 8px; padding: 12px 16px; margin-top: 10px;'>
             <div style='font-size: 0.95rem; font-weight: 600; color: #f8fafc;'>雙教練會診狀態診斷：</div>
             <div style='font-size: 0.9rem; color: #cbd5e1; margin-top: 4px;'>{diagnosis_text}</div>
             <div style='font-size: 0.78rem; color: #94a3b8; margin-top: 6px;'>{data_note}</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
     else:
         st.caption(data_note)
 
@@ -1824,7 +1830,7 @@ with tab_activity:
                         b_note = "🚨 單側肌力代償 / 隱性疲勞拉傷風險！"
                         b_color = "#ef4444"
 
-                    st.markdown(f"""
+                    render_html(f"""
                     <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;'>
                         <span style='font-size: 0.92rem; font-weight: 700; color: #f8fafc;'>⚖️ 左右觸地平衡 (GCT Balance)</span>
                         <span style='font-size: 0.72rem; color: {b_color}; font-weight: bold;'>{b_status}</span>
@@ -1840,14 +1846,14 @@ with tab_activity:
                         <div style='width: {r_pct}%; background: linear-gradient(90deg, #a78bfa, #8b5cf6);'></div>
                     </div>
                     <div style='font-size: 0.75rem; color: #94a3b8;'>🛡️ <strong>防傷評定：</strong>{b_note}</div>
-                    """, unsafe_allow_html=True)
+                    """)
                 else:
-                    st.markdown("""
+                    render_html("""
                     <div style='padding: 6px 0;'>
                         <div style='font-size: 0.9rem; font-weight: 700; color: #f8fafc; margin-bottom: 4px;'>⚖️ 左右觸地平衡 (GCT Balance)</div>
                         <div style='font-size: 0.78rem; color: #64748b;'>此活動未偵測到左右觸地數據（需配戴跑步動態感測器或支援心率帶）</div>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """)
         
         with c_stam:
             with st.container(border=True):
@@ -1949,7 +1955,7 @@ with tab_activity:
                     st_badge_bg = "rgba(16, 185, 129, 0.15)"
                     st_note = f"⚡ <strong>耐力儲備：</strong>體力儲備充沛 (完賽剩餘 <strong style='color:#10b981;'>{st_end:.0f}%</strong>，骨骼衝擊負荷 <strong>{impact_l:,.0f}</strong>)，無過早撞牆風險，身體恢復迅速！"
 
-                st.markdown(f"""
+                render_html(f"""
                 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;'>
                     <span style='font-size: 0.92rem; font-weight: 700; color: #f8fafc;'>🔋 Stamina 體能剩餘與訓練效益</span>
                     <span style='font-size: 0.72rem; background: {st_badge_bg}; color: {st_color}; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>{te_lbl}</span>
@@ -1969,7 +1975,7 @@ with tab_activity:
                     </div>
                 </div>
                 <div style='font-size: 0.75rem; color: #94a3b8;'>{st_note}</div>
-                """, unsafe_allow_html=True)
+                """)
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
@@ -2499,7 +2505,7 @@ with tab_activity:
 
             rec_hours = int(min(48, max(12, tot_km * 1.5 + (4 if (avg_hr and avg_hr > 175) else 0))))
 
-            st.markdown(f"""
+            render_html(f"""
             <div style="background: rgba(30, 58, 138, 0.25); border-left: 4px solid #3b82f6; padding: 14px; border-radius: 8px; margin-bottom: 12px;">
                 <div style="font-weight: 700; color: #60a5fa; font-size: 1rem; margin-bottom: 6px;">
                     🧬 路格教練 (Coach Luger) 生化生理與心血管審查
@@ -2520,7 +2526,7 @@ with tab_activity:
                     <li><strong>修復指引：</strong> 建議安排 <strong>{rec_hours} 小時</strong> 主動修復，重點滾筒放鬆小腿阿基里斯腱與臀大肌。</li>
                 </ul>
             </div>
-            """, unsafe_allow_html=True)
+            """)
 
         st.divider()
 

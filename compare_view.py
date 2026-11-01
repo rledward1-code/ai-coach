@@ -1,11 +1,17 @@
 # compare_view.py - 雙場賽事 / 訓練全維度深度對決與差異比較中樞 (具備全面容錯機制)
 import os
+import textwrap
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from data_processor import process_data
+
+def render_html(html_str: str):
+    """安全渲染 HTML，防止 CommonMark 縮排導致程式碼區塊解析錯誤"""
+    st.markdown(textwrap.dedent(html_str).strip(), unsafe_allow_html=True)
+
 
 @st.cache_data(show_spinner=False)
 def load_and_process_cached(file_path):
@@ -233,58 +239,58 @@ def render_compare_tab():
     # 頂部第 1 列卡片：總里程、平均配速、平均心率、平均步頻、最高心率
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1:
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.78rem; color:#94a3b8; margin-bottom:2px;'>🔵 A: {m_a['dist_km']:.2f} km | 🟠 B: {m_b['dist_km']:.2f} km</div>
             <div class='metric-val'>{m_b['dist_km']:.2f} km</div>
             <div class='metric-lbl'>總里程</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with m2:
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.78rem; color:#94a3b8; margin-bottom:2px;'>🔵 {m_a['pace_str']} vs 🟠 {m_b['pace_str']} {pace_badge}</div>
             <div class='metric-val'>{m_b['pace_str']}</div>
             <div class='metric-lbl'>平均配速 (/km)</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with m3:
         hr_a_disp = f"{m_a['avg_hr']:.0f}" if m_a['avg_hr'] else "—"
         hr_b_disp = f"{m_b['avg_hr']:.0f}" if m_b['avg_hr'] else "—"
         hr_badge = make_diff_badge(m_a['avg_hr'], m_b['avg_hr'], " bpm", invert=True, precision=1)
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.78rem; color:#94a3b8; margin-bottom:2px;'>🔵 {hr_a_disp} vs 🟠 {hr_b_disp} {hr_badge}</div>
             <div class='metric-val' style='color:#f43f5e;'>{hr_b_disp} bpm</div>
             <div class='metric-lbl'>平均心率</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with m4:
         cad_a_disp = f"{m_a['cadence']:.0f}" if m_a['cadence'] else "—"
         cad_b_disp = f"{m_b['cadence']:.0f}" if m_b['cadence'] else "—"
         cad_badge = make_diff_badge(m_a['cadence'], m_b['cadence'], " spm", precision=1)
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.78rem; color:#94a3b8; margin-bottom:2px;'>🔵 {cad_a_disp} vs 🟠 {cad_b_disp} {cad_badge}</div>
             <div class='metric-val' style='color:#fbbf24;'>{cad_b_disp} spm</div>
             <div class='metric-lbl'>平均步頻 (SPM)</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with m5:
         maxhr_a_disp = f"{m_a['max_hr']:.0f}" if m_a['max_hr'] else "—"
         maxhr_b_disp = f"{m_b['max_hr']:.0f}" if m_b['max_hr'] else "—"
         maxhr_badge = make_diff_badge(m_a['max_hr'], m_b['max_hr'], " bpm", invert=True, precision=0)
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.78rem; color:#94a3b8; margin-bottom:2px;'>🔵 {maxhr_a_disp} vs 🟠 {maxhr_b_disp} {maxhr_badge}</div>
             <div class='metric-val' style='color:#a855f7;'>{maxhr_b_disp} bpm</div>
             <div class='metric-lbl'>最高心率</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
@@ -294,85 +300,85 @@ def render_compare_tab():
         step_badge = make_diff_badge(m_a['step_length'], m_b['step_length'], "cm", precision=1)
         step_a_str = f"{m_a['step_length']:.1f}" if m_a['step_length'] else "—"
         step_b_str = f"{m_b['step_length']:.1f}" if m_b['step_length'] else "—"
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.72rem; color:#94a3b8; margin-bottom:2px;'>🔵 {step_a_str} vs 🟠 {step_b_str} {step_badge}</div>
             <div class='metric-val' style='font-size:1.15rem; color:#c084fc;'>{step_b_str} cm</div>
             <div class='metric-lbl'>👣 平均步幅</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with d2:
         gct_badge = make_diff_badge(m_a['gct'], m_b['gct'], "ms", invert=True, precision=1)
         gct_a_str = f"{m_a['gct']:.0f}" if m_a['gct'] else "—"
         gct_b_str = f"{m_b['gct']:.0f}" if m_b['gct'] else "—"
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.72rem; color:#94a3b8; margin-bottom:2px;'>🔵 {gct_a_str} vs 🟠 {gct_b_str} {gct_badge}</div>
             <div class='metric-val' style='font-size:1.15rem; color:#34d399;'>{gct_b_str} ms</div>
             <div class='metric-lbl'>⚡ 平均觸地時間</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with d3:
         vo_badge = make_diff_badge(m_a['vertical_osc'], m_b['vertical_osc'], "cm", invert=True, precision=1)
         vo_a_str = f"{m_a['vertical_osc']:.1f}" if m_a['vertical_osc'] else "—"
         vo_b_str = f"{m_b['vertical_osc']:.1f}" if m_b['vertical_osc'] else "—"
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.72rem; color:#94a3b8; margin-bottom:2px;'>🔵 {vo_a_str} vs 🟠 {vo_b_str} {vo_badge}</div>
             <div class='metric-val' style='font-size:1.15rem; color:#38bdf8;'>{vo_b_str} cm</div>
             <div class='metric-lbl'>📐 垂直振幅</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with d4:
         vr_badge = make_diff_badge(m_a['vertical_ratio'], m_b['vertical_ratio'], "%", invert=True, precision=1)
         vr_a_str = f"{m_a['vertical_ratio']:.1f}" if m_a['vertical_ratio'] else "—"
         vr_b_str = f"{m_b['vertical_ratio']:.1f}" if m_b['vertical_ratio'] else "—"
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.72rem; color:#94a3b8; margin-bottom:2px;'>🔵 {vr_a_str} vs 🟠 {vr_b_str} {vr_badge}</div>
             <div class='metric-val' style='font-size:1.15rem; color:#f59e0b;'>{vr_b_str} %</div>
             <div class='metric-lbl'>🎯 移動效率(垂直比)</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with d5:
         bal_a_str = f"{m_a['balance']:.1f}%" if m_a['balance'] else "—"
         bal_b_str = f"{m_b['balance']:.1f}%" if m_b['balance'] else "—"
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.72rem; color:#94a3b8; margin-bottom:2px;'>🔵 {bal_a_str} vs 🟠 {bal_b_str}</div>
             <div class='metric-val' style='font-size:1.15rem; color:#ec4899;'>{bal_b_str} 左</div>
             <div class='metric-lbl'>⚖️ 左右平衡</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with d6:
         pwr_badge = make_diff_badge(m_a['power'], m_b['power'], "W", precision=0)
         pwr_a_str = f"{m_a['power']:.0f}" if m_a['power'] else "—"
         pwr_b_str = f"{m_b['power']:.0f}" if m_b['power'] else "—"
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.72rem; color:#94a3b8; margin-bottom:2px;'>🔵 {pwr_a_str} vs 🟠 {pwr_b_str} {pwr_badge}</div>
             <div class='metric-val' style='font-size:1.15rem; color:#fb7185;'>{pwr_b_str} W</div>
             <div class='metric-lbl'>⚡ 平均功率</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
     # 頂部第 3 列：完賽時間對決、能效比 (EF)、每跳移動公尺 (DPB)
     r3_1, r3_2, r3_3 = st.columns(3)
     with r3_1:
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.78rem; color:#94a3b8; margin-bottom:2px;'>🔵 {m_a['dur_str']} vs 🟠 {m_b['dur_str']} {time_badge}</div>
             <div class='metric-val' style='color:#38bdf8;'>{m_b['dur_str']}</div>
             <div class='metric-lbl'>⏱️ 完賽總時間 (Total Time)</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with r3_2:
         if m_a['ef'] and m_b['ef']:
@@ -384,25 +390,25 @@ def render_compare_tab():
             ef_badge = ""
             ef_b_str = f"{m_b['ef']:.2f}" if m_b['ef'] else "—"
             ef_a_str = f"{m_a['ef']:.2f}" if m_a['ef'] else "—"
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.78rem; color:#94a3b8; margin-bottom:2px;'>🔵 {ef_a_str} vs 🟠 {ef_b_str} {ef_badge}</div>
             <div class='metric-val' style='color:#10b981;'>{ef_b_str}</div>
             <div class='metric-lbl'>🔋 跑步能效比 EF (Speed / HR)</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with r3_3:
         dpb_badge = make_diff_badge(m_a['dpb'], m_b['dpb'], "m", precision=2)
         dpb_a_str = f"{m_a['dpb']:.2f}m" if m_a['dpb'] else "—"
         dpb_b_str = f"{m_b['dpb']:.2f}m" if m_b['dpb'] else "—"
-        st.markdown(f"""
+        render_html(f"""
         <div class='metric-card'>
             <div style='font-size:0.78rem; color:#94a3b8; margin-bottom:2px;'>🔵 {dpb_a_str} vs 🟠 {dpb_b_str} {dpb_badge}</div>
             <div class='metric-val' style='color:#eab308;'>{dpb_b_str} /跳</div>
             <div class='metric-lbl'>🕊️ 每跳移動距離 (Distance Per Beat)</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 
@@ -741,7 +747,7 @@ def render_compare_tab():
         hr_diff_str = f"{abs(m_b['avg_hr'] - m_a['avg_hr']):.1f} bpm" if (m_a['avg_hr'] and m_b['avg_hr']) else "無心率對比"
         gct_diff_str = f"{abs(m_b['gct'] - m_a['gct']):.1f} ms" if (m_a['gct'] and m_b['gct']) else "無觸地對比"
         
-        st.markdown(f"""
+        render_html(f"""
         <div style="background: rgba(30, 58, 138, 0.25); border-left: 4px solid #3b82f6; padding: 14px; border-radius: 8px; margin-bottom: 12px;">
             <div style="font-weight: 700; color: #60a5fa; font-size: 1rem; margin-bottom: 6px;">
                 🧬 路格教練 (Coach Luger) 生化生理差值審查
@@ -761,7 +767,7 @@ def render_compare_tab():
                 <li><strong>速度差異物理本質：</strong> 步頻變動僅 <code>{cad_diff_pct:.1f}%</code>，而步幅縮減達 <code>{stride_diff_pct:.1f}%</code>！這證明速度差異源自於 <strong>「推蹬推進步幅縮短」</strong>，而非步頻崩潰。</li>
             </ul>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
     # ========================================================
     # 6. 逐公里每圈數據詳細對照表 (Lap-by-Lap Split Delta Table)
