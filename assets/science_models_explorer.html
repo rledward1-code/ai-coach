@@ -78,7 +78,7 @@
         <h2 class="text-xs font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
           <span>🎛️</span> 跑者生理基線 (Inputs)
         </h2>
-        <span class="text-[11px] text-slate-500">8 項數據</span>
+        <span class="text-[11px] text-slate-500">9 項數據（生理 + 環境）</span>
       </div>
 
       <div id="node-age" onclick="selectNode('age')" onmouseenter="showTooltip(event, 'age')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
@@ -121,6 +121,14 @@
         <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">半馬 2:01:08</span>
       </div>
 
+
+      <div id="node-temp" onclick="selectNode('temp')" onmouseenter="showTooltip(event, 'temp')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <span class="text-sm">🌡️</span>
+          <span class="font-bold text-xs text-sky-200">環境氣溫與熱應力 (Temp)</span>
+        </div>
+        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">15°C～28°C</span>
+      </div>
       <div id="node-slope" onclick="selectNode('slope')" onmouseenter="showTooltip(event, 'slope')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
         <div class="flex items-center gap-2">
           <span class="text-sm">⛰️</span>
@@ -337,6 +345,16 @@
         </div>
       </div>
 
+
+        <div>
+          <div class="flex justify-between text-slate-300 mb-0.5">
+            <span>環境氣溫 (Ambient Temp)：</span>
+            <span id="val-temp" class="text-sky-400 font-mono">15 °C (最適溫)</span>
+          </div>
+          <input type="range" id="input-temp" min="10" max="35" value="15" step="1" class="w-full accent-sky-400 h-1.5" oninput="recalculate()">
+        </div>
+      </div>
+
       <!-- Sliders 2 -->
       <div class="space-y-2">
         <div>
@@ -386,6 +404,15 @@
           <span class="text-slate-400">Riegel 全馬推估：</span>
           <span id="calc-fm" class="font-bold text-amber-400 font-mono">4小時12分</span>
         </div>
+
+        <div class="flex justify-between">
+          <span class="text-slate-400">心血管漂移預估：</span>
+          <span id="calc-drift" class="font-bold text-sky-400 font-mono">0 bpm (無漂移)</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">高溫熱折損比率：</span>
+          <span id="calc-penalty" class="font-bold text-amber-400 font-mono">+0.0% (最適溫)</span>
+        </div>
         <div class="flex justify-between">
           <span class="text-slate-400">Minetti GAP 等效：</span>
           <span id="calc-gap" class="font-bold text-emerald-400 font-mono">5:22 /km</span>
@@ -407,6 +434,21 @@
   <script>
     // 完整節點資料庫
     const nodeRelations = {
+      'temp': {
+        title: '環境氣溫與熱應力 (Ambient Temp & Thermal Stress)',
+        icon: '🌡️',
+        badge: '15°C～28°C',
+        category: '環境參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['decoupling', 'riegel', 'stamina', 'banister', 'mp', 'pred'],
+        mechanism: '馬拉松最佳競賽氣溫為 10°C~15°C。當環境氣溫升高（如長榮半馬 27°C 烈日 vs 台北馬預期 15°C 黃金低溫），人體為了維持核心體溫，會將大量心輸出量分流至皮下微血管進行排汗散熱，導致骨骼肌有效血流減少，引發顯著的心血管漂移（心率上升 5~15 bpm）與能效比 (EF) 折損。權威文獻證實：氣溫每高於 15°C 1°C，馬拉松完賽配速平均折損約 0.3%~0.5%。',
+        formula: 'Pace_Penalty = max(0, (Temp - 15) × 0.4%)\nΔHR_Drift = max(0, (Temp - 15) × 1.2 bpm)\nT_adjusted = T_riegel × (1 + Pace_Penalty)',
+        links: [
+          '• El Helou, N. et al. (2012). Impact of Environmental Parameters on Marathon Running Performance in Both Women and Men. PLoS ONE, 7(5), e37407.',
+          '• Coyle, E. F. & González-Alonso, J. (2001). Cardiovascular drift during prolonged exercise. Exerc Sport Sci Rev, 29(2), 88-92.',
+          '• Montain, S. J. & Coyle, E. F. (1992). Influence of graded dehydration on hyperthermia and cardiovascular drift. J Appl Physiol.'
+        ]
+      },
       // Inputs
       'age': {
         title: '年齡 (Age) 生理影響模型',
@@ -552,7 +594,7 @@ VDOT = VO2 / %VO2max',
         icon: '🎯',
         badge: '全馬推演',
         category: '核心計算模型',
-        upstream: ['pb'],
+        upstream: ['pb', 'temp'],
         downstream: ['pred'],
         mechanism: '工程師 Peter Riegel 於 1981 年提出的耐力衰減冪定律。假設人體隨著運動距離加倍，速度會因肌肉疲勞與能量枯竭衰減約 6% ($b=1.06$)。本系統用以推算台北馬拉松 Sub-3:45 的可行性。',
         formula: 'T2 = T1 × (D2 / D1)^1.06',
@@ -563,7 +605,7 @@ VDOT = VO2 / %VO2max',
         icon: '📈',
         badge: 'PMC 體能',
         category: '核心計算模型',
-        upstream: ['age', 'rhr', 'maxhr'],
+        upstream: ['age', 'rhr', 'maxhr', 'temp'],
         downstream: ['gsheetout'],
         mechanism: 'Eric Banister 博士提出的生理負荷量化指標。將運動時的心率儲備比率進行指數加權（高心率負荷呈指數倍增），產出單次訓練量 (Training Impulse)，並滾動推算 42天體能 (CTL) 與 7天疲勞 (ATL)。',
         formula: 'TRIMP = t(min) × ΔHR × 0.64e^(1.92 · ΔHR)
@@ -586,7 +628,7 @@ TSB = CTL - ATL',
         icon: '📉',
         badge: '心率漂移',
         category: '核心計算模型',
-        upstream: ['gait'],
+        upstream: ['gait', 'temp'],
         downstream: ['stop阀', 'gsheetout'],
         mechanism: 'Joe Friel 提出的心血管穩態檢測法。在等速平坦長跑中，比較前半程與後半程的「心率 vs 速度」比值。若後半程心率飄升超過 5%，代表脫水、體溫過高或慢縮肌衰退，心血管已產生脫鉤。',
         formula: 'Decoupling % = (EF_first - EF_second) / EF_first × 100%
@@ -818,6 +860,7 @@ TSB = CTL - ATL',
       const age = parseInt(document.getElementById('input-age').value);
       const rhr = parseInt(document.getElementById('input-rhr').value);
       const maxhr = parseInt(document.getElementById('input-maxhr').value);
+      const temp = parseInt(document.getElementById('input-temp') ? document.getElementById('input-temp').value : 15);
       const hmMinutes = parseInt(document.getElementById('input-hm').value);
       const slope = parseFloat(document.getElementById('input-slope').value);
       const paceSec = parseInt(document.getElementById('input-pace').value);
@@ -825,6 +868,8 @@ TSB = CTL - ATL',
       document.getElementById('val-age').textContent = age + ' 歲';
       document.getElementById('val-rhr').textContent = rhr + ' bpm';
       document.getElementById('val-maxhr').textContent = maxhr + ' bpm';
+      const tempTag = temp <= 15 ? ' (最適低溫)' : (temp >= 25 ? ' (高溫熱應力)' : ' (微熱)');
+      if (document.getElementById('val-temp')) document.getElementById('val-temp').textContent = temp + ' °C' + tempTag;
       
       const hmH = Math.floor(hmMinutes / 60);
       const hmM = hmMinutes % 60;
@@ -853,11 +898,25 @@ TSB = CTL - ATL',
       const vdot = (vo2 / pctMax).toFixed(1);
       document.getElementById('calc-vdot').textContent = `${vdot}`;
 
-      // 4. Riegel
-      const fmMinutes = hmMinutes * Math.pow(42.195 / 21.0975, 1.058);
-      const fmH = Math.floor(fmMinutes / 60);
-      const fmM = Math.round(fmMinutes % 60);
-      document.getElementById('calc-fm').textContent = `${fmH}小時${fmM}分`;
+      // 4. Riegel 全馬推估 + 溫度熱折損 (El Helou 模型: >15°C 每度 +0.4%)
+      const baseFmMin = hmMinutes * Math.pow(42.195 / 21.0975, 1.058);
+      const tempDelta = Math.max(0, temp - 15);
+      const penaltyPct = tempDelta * 0.4; // %
+      const adjFmMin = baseFmMin * (1 + penaltyPct / 100);
+      const fmH = Math.floor(adjFmMin / 60);
+      const fmM = Math.round(adjFmMin % 60);
+      const extraMin = Math.round(adjFmMin - baseFmMin);
+      document.getElementById('calc-fm').textContent = `${fmH}小時${fmM}分` + (extraMin > 0 ? ` (+${extraMin}分)` : '');
+
+      // 5. 溫度心血管漂移與折損率顯示
+      const hrDrift = Math.round(tempDelta * 1.2);
+      if (document.getElementById('calc-drift')) {
+        document.getElementById('calc-drift').textContent = tempDelta > 0 ? `+${hrDrift} bpm (心率上浮)` : '0 bpm (無漂移)';
+      }
+      if (document.getElementById('calc-penalty')) {
+        const pacePenaltySec = Math.round((adjFmMin - baseFmMin) * 60 / 42.195);
+        document.getElementById('calc-penalty').textContent = tempDelta > 0 ? `+${penaltyPct.toFixed(1)}% (+${pacePenaltySec}s/km)` : '+0.0% (最適溫)';
+      }
 
       // 5. GAP
       const i = slope / 100.0;
