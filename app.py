@@ -1274,12 +1274,13 @@ auth_manager.render_auth_badge()
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # 宣告五大核心分頁 (依照跑者每日使用動線優化：1.體能晨檢 -> 2.課表排程 -> 3.活動深度解析 -> 4.配速模擬與推演 -> 5.雙場對決比較)
-tab_pmc, tab_schedule, tab_activity, tab_sim, tab_compare = st.tabs([
+tab_pmc, tab_schedule, tab_activity, tab_sim, tab_compare, tab_science = st.tabs([
     "🔋 體能就緒與 PMC 負荷",
     "📅 8週課表實戰排程",
     "📈 單次活動深度剖析",
     "🎛️ 配速模擬與大賽推演",
-    "⚔️ 雙場對決比較 (Head-to-Head)"
+    "⚔️ 雙場對決比較 (Head-to-Head)",
+    "🧬 運動科學演算法與公式原理解析"
 ])
 
 # ==========================================
@@ -2650,3 +2651,18 @@ with tab_sim:
 # ==========================================
 with tab_compare:
     render_compare_tab()
+
+# ==========================================
+# TAB 6: 運動科學演算法與公式原理解析 (Science Explorer)
+# ==========================================
+with tab_science:
+    st.markdown("### 🧬 AI Coach 運動生理模型與計算原理全景解析")
+    st.caption("深度解密系統背後的八大運動科學演算法、數學推導邏輯與權威學術論文依據。支援即時參數連動與高亮關聯。")
+
+    science_html_path = "assets/science_models_explorer.html"
+    if os.path.exists(science_html_path):
+        with open(science_html_path, "r", encoding="utf-8") as f_sci:
+            sci_code = f_sci.read()
+        components.html(sci_code, height=1280, scrolling=True)
+    else:
+        st.info("💡 正在載入運動生理模型解析器...")

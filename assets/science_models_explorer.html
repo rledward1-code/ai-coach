@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Coach 運動生理模型與計算原理</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* 霓虹發光與連線動態效果 */
+    .glow-active {
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.6), inset 0 0 10px rgba(16, 185, 129, 0.3) !important;
+      border-color: #10b981 !important;
+      transform: translateY(-2px);
+    }
+    .glow-upstream {
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.6), inset 0 0 10px rgba(56, 189, 248, 0.3) !important;
+      border-color: #38bdf8 !important;
+      transform: translateY(-2px);
+    }
+    .glow-downstream {
+      box-shadow: 0 0 18px rgba(245, 158, 11, 0.6), inset 0 0 10px rgba(245, 158, 11, 0.3) !important;
+      border-color: #f59e0b !important;
+      transform: translateY(-2px);
+    }
+    .node-dim {
+      opacity: 0.28 !important;
+      filter: grayscale(80%);
+    }
+    .transition-all-custom {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 p-4 md:p-6 font-sans antialiased min-h-screen">
+
+  <!-- 頂部標題與導讀 -->
+  <div class="max-w-7xl mx-auto mb-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🧬</span>
+          <h1 class="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-sky-400 to-amber-300">
+            AI Coach 運動生理模型與計算原理全景圖
+          </h1>
+        </div>
+        <p class="text-sm text-slate-400 mt-1">
+          揭開雙教練（路格 & 佩絲）背後的八大運動科學演算法、公式推導邏輯與權威學術文獻連結。
+        </p>
+      </div>
+      <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>互動模式已啟動：點擊任一節點即可觀測連動影響</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 說明指示橫幅 -->
+  <div class="max-w-7xl mx-auto mb-6 bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-wrap items-center justify-between text-xs gap-3">
+    <div class="flex items-center gap-2">
+      <span class="text-base">💡</span>
+      <span class="text-slate-300">
+        <strong>使用說明：</strong> 點擊左側「<span class="text-sky-400 font-semibold">生理輸入參數</span>」檢視它影響了哪些理論；或點擊中間「<span class="text-emerald-400 font-semibold">計算模型</span>」查看其上下游關聯與文獻！
+      </span>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-sky-400"></span><span>輸入參數</span></div>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-400"></span><span>計算模型</span></div>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-400"></span><span>沙盤推演輸出</span></div>
+      <button onclick="resetSelection()" class="text-slate-400 hover:text-slate-200 underline ml-2">重置選取</button>
+    </div>
+  </div>
+
+  <!-- 核心三大管線佈局 (3 Columns) -->
+  <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
+
+    <!-- COLUMN 1: 生理輸入參數 (4 cols) -->
+    <div class="lg:col-span-4 flex flex-col gap-3">
+      <div class="flex items-center justify-between border-b border-sky-900/40 pb-2">
+        <h2 class="text-base font-bold text-sky-400 flex items-center gap-2">
+          <span>🎛️</span> 跑者生理基線 (Inputs)
+        </h2>
+        <span class="text-xs text-slate-500">8 項核心數據</span>
+      </div>
+
+      <!-- Input Nodes -->
+      <div id="node-age" onclick="selectNode('age')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-sky-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-sky-300">年齡 (Age)</span>
+          <span class="text-xs bg-sky-950 text-sky-400 px-2 py-0.5 rounded border border-sky-800/50">45 歲</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          決定心臟細胞老化係數、Tanaka 公式估算 HRmax 上限、Banister TRIMP 負荷之性別與年齡加權指數。
+        </p>
+      </div>
+
+      <div id="node-rhr" onclick="selectNode('rhr')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-sky-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-sky-300">靜息晨脈 (Rest HR / RHR)</span>
+          <span class="text-xs bg-sky-950 text-sky-400 px-2 py-0.5 rounded border border-sky-800/50">53～56 bpm</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          心血管副交感神經活性指標；決定 Karvonen 儲備心率 (HRR) 底線，晨脈驟升 >5 bpm 即發布疲勞警報。
+        </p>
+      </div>
+
+      <div id="node-maxhr" onclick="selectNode('maxhr')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-sky-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-sky-300">最大心率 (Max HR)</span>
+          <span class="text-xs bg-sky-950 text-sky-400 px-2 py-0.5 rounded border border-sky-800/50">200～210 bpm</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          心臟每搏動能最高極限。作為所有百分比分區與儲備心率公式的分母絕對天花板。
+        </p>
+      </div>
+
+      <div id="node-lthr" onclick="selectNode('lthr')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-sky-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-sky-300">乳酸閾值心率 (LTHR)</span>
+          <span class="text-xs bg-sky-950 text-sky-400 px-2 py-0.5 rounded border border-sky-800/50">184～193 bpm</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          有氧氧化與無氧醣酵解的生理臨界點 (OBLA 4.0 mmol/L)。決定神聖 Zone 2 上限 (LTHR × 89%)。
+        </p>
+      </div>
+
+      <div id="node-pb" onclick="selectNode('pb')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-sky-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-sky-300">近期賽事實績 (Race PB)</span>
+          <span class="text-xs bg-sky-950 text-sky-400 px-2 py-0.5 rounded border border-sky-800/50">長榮半馬 2:01:08</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          大賽推演的基石基準。餵入 Jack Daniels 公式推導 VDOT 跑力，並透過 Riegel 模型預測全馬完賽時間。
+        </p>
+      </div>
+
+      <div id="node-slope" onclick="selectNode('slope')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-sky-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-sky-300">地形起伏與坡度 (Grade)</span>
+          <span class="text-xs bg-sky-950 text-sky-400 px-2 py-0.5 rounded border border-sky-800/50">社區 +6.0% / -4.6%</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          重力位能與肌肉離心煞車負擔。觸發 Minetti 坡度能耗代謝方程式，計算 GAP 坡度等效配速。
+        </p>
+      </div>
+
+      <div id="node-hrv" onclick="selectNode('hrv')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-sky-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-sky-300">夜間 HRV (rMSSD) 與睡眠</span>
+          <span class="text-xs bg-sky-950 text-sky-400 px-2 py-0.5 rounded border border-sky-800/50">32～39 ms / 睡眠 77</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          微血管與自主神經修復標靶。連動 Firstbeat 與 Plews 7天滾動常態分佈，決定當日課表強度放行。
+        </p>
+      </div>
+
+      <div id="node-gait" onclick="selectNode('gait')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-sky-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-sky-300">步態動力學 (Cadence, GCT)</span>
+          <span class="text-xs bg-sky-950 text-sky-400 px-2 py-0.5 rounded border border-sky-800/50">187 spm / 245 ms</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          彈簧剛性 ($K_{leg}$) 與左右平衡 (Balance 49.7:50.3)。推算衝擊負荷 (Impact Load) 與推蹬功率 (W)。
+        </p>
+      </div>
+    </div>
+
+    <!-- COLUMN 2: 計算模型與理論公式 (4 cols) -->
+    <div class="lg:col-span-4 flex flex-col gap-3">
+      <div class="flex items-center justify-between border-b border-emerald-900/40 pb-2">
+        <h2 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+          <span>⚡</span> 運動科學計算模型 (Models)
+        </h2>
+        <span class="text-xs text-slate-500">8 大經典理論</span>
+      </div>
+
+      <!-- Model Nodes -->
+      <div id="node-karvonen" onclick="selectNode('karvonen')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-emerald-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-emerald-300">1. Karvonen 儲備心率法</span>
+          <span class="text-xs bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">心率區間</span>
+        </div>
+        <code class="text-[11px] text-emerald-400 block bg-slate-950 p-1.5 rounded mb-1.5 font-mono">
+          HR_target = RHR + (HRmax - RHR) × %Intensity
+        </code>
+        <p class="text-xs text-slate-400">
+          <strong>路格神聖 Zone 2 守門線 (148~163 bpm)</strong> 的核心演算法。排除了虛榮配速，確保 80% 時間建立純粒線體燃脂引擎。
+        </p>
+        <div class="mt-2 text-right">
+          <a href="https://pubmed.ncbi.nlm.nih.gov/13474737/" target="_blank" onclick="event.stopPropagation()" class="text-[11px] text-sky-400 hover:underline">📄 Karvonen et al. (1957) PubMed ↗</a>
+        </div>
+      </div>
+
+      <div id="node-daniels" onclick="selectNode('daniels')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-emerald-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-emerald-300">2. Jack Daniels VDOT 跑力公式</span>
+          <span class="text-xs bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">配速換算</span>
+        </div>
+        <code class="text-[11px] text-emerald-400 block bg-slate-950 p-1.5 rounded mb-1.5 font-mono">
+          VO2 = -4.60 + 0.182258·v + 0.000104·v²
+        </code>
+        <p class="text-xs text-slate-400">
+          將單次賽事實績轉換為綜合攝氧指標，並精密導出 E (輕鬆)、M (馬拉松)、T (乳酸閾值)、I (間歇) 等專項訓練配速。
+        </p>
+        <div class="mt-2 text-right">
+          <a href="https://www.amazon.com/Daniels-Running-Formula-Jack/dp/1450450058" target="_blank" onclick="event.stopPropagation()" class="text-[11px] text-sky-400 hover:underline">📘 Daniels' Running Formula (4th Ed) ↗</a>
+        </div>
+      </div>
+
+      <div id="node-riegel" onclick="selectNode('riegel')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-emerald-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-emerald-300">3. Riegel 賽事耐力冪定律</span>
+          <span class="text-xs bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">沙盤推演</span>
+        </div>
+        <code class="text-[11px] text-emerald-400 block bg-slate-950 p-1.5 rounded mb-1.5 font-mono">
+          T2 = T1 × (D2 / D1)^1.06
+        </code>
+        <p class="text-xs text-slate-400">
+          Peter Riegel 耐力疲勞曲線方程式。本系統透過半馬實績外推全馬時間，並動態依據 LSD 步幅衰減度微調指數 $b$ (1.06~1.08)。
+        </p>
+        <div class="mt-2 text-right">
+          <a href="https://www.jstor.org/stable/27850402" target="_blank" onclick="event.stopPropagation()" class="text-[11px] text-sky-400 hover:underline">📄 Riegel (1981) Am. Scientist ↗</a>
+        </div>
+      </div>
+
+      <div id="node-banister" onclick="selectNode('banister')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-emerald-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-emerald-300">4. Banister TRIMP 負荷衝量</span>
+          <span class="text-xs bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">疲勞管理</span>
+        </div>
+        <code class="text-[11px] text-emerald-400 block bg-slate-950 p-1.5 rounded mb-1.5 font-mono">
+          TRIMP = D × ΔHRratio × 0.64e^(1.92 × ΔHRratio)
+        </code>
+        <p class="text-xs text-slate-400">
+          將心率與持續時間進行指數加權積分，並結合 Coggan 42天 CTL (體能) 與 7天 ATL (疲勞) 產出 TSB 賽前巔峰平衡指標。
+        </p>
+        <div class="mt-2 text-right">
+          <a href="https://pubmed.ncbi.nlm.nih.gov/1814742/" target="_blank" onclick="event.stopPropagation()" class="text-[11px] text-sky-400 hover:underline">📄 Banister (1991) Human Kinetics ↗</a>
+        </div>
+      </div>
+
+      <div id="node-minetti" onclick="selectNode('minetti')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-emerald-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-emerald-300">5. Minetti 坡度代謝方程式 (GAP)</span>
+          <span class="text-xs bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">地形換算</span>
+        </div>
+        <code class="text-[11px] text-emerald-400 block bg-slate-950 p-1.5 rounded mb-1.5 font-mono">
+          C_r = 155.4·i⁵ - 30.4·i⁴ - 32.8·i³ + 43.1·i² + 21.5·i + 3.6
+        </code>
+        <p class="text-xs text-slate-400">
+          五次多項式計算坡度 $i$ 上的代謝能耗。解析 Edward 在社區上坡 7:15/km 時，實際產生相當於平地 5:20/km 的同等生理衝擊。
+        </p>
+        <div class="mt-2 text-right">
+          <a href="https://journals.physiology.org/doi/full/10.1152/japplphysiol.01177.2001" target="_blank" onclick="event.stopPropagation()" class="text-[11px] text-sky-400 hover:underline">📄 Minetti et al. (2002) J. Appl. Physiol ↗</a>
+        </div>
+      </div>
+
+      <div id="node-decoupling" onclick="selectNode('decoupling')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-emerald-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-emerald-300">6. 有氧脫鉤與能效比 (EF / Decoupling)</span>
+          <span class="text-xs bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">心率漂移</span>
+        </div>
+        <code class="text-[11px] text-emerald-400 block bg-slate-950 p-1.5 rounded mb-1.5 font-mono">
+          Decoupling % = (EF_first - EF_second) / EF_first × 100%
+        </code>
+        <p class="text-xs text-slate-400">
+          對照前半程 vs 後半程之速度與心率比值 ($Speed / HR$)。脫鉤率 < 5% 代表心血管效率完好（如 11/01 16K 之 +2bpm 零漂移）。
+        </p>
+        <div class="mt-2 text-right">
+          <a href="https://www.trainingpeaks.com/blog/aerobic-endurance-and-decoupling/" target="_blank" onclick="event.stopPropagation()" class="text-[11px] text-sky-400 hover:underline">🌐 Joe Friel Decoupling Protocol ↗</a>
+        </div>
+      </div>
+
+      <div id="node-stamina" onclick="selectNode('stamina')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-emerald-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-emerald-300">7. Firstbeat 即時體力模型 (Stamina)</span>
+          <span class="text-xs bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">能量消耗</span>
+        </div>
+        <code class="text-[11px] text-emerald-400 block bg-slate-950 p-1.5 rounded mb-1.5 font-mono">
+          Stamina_t = Stamina_0 - ∫(W_anaerobic + W_aerobic) dt
+        </code>
+        <p class="text-xs text-slate-400">
+          結合肌糖原儲備衰減與高強度無氧功率透支計算。評估賽後剩餘體能（例如 16K 跑完後 Stamina 仍有 56% 餘裕）。
+        </p>
+        <div class="mt-2 text-right">
+          <a href="https://www.firstbeat.com/en/science-and-physiology/fitness-and-performance/" target="_blank" onclick="event.stopPropagation()" class="text-[11px] text-sky-400 hover:underline">🌐 Firstbeat Analytics Whitepaper ↗</a>
+        </div>
+      </div>
+
+      <div id="node-plews" onclick="selectNode('plews')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-emerald-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-emerald-300">8. Plews HRV 滾動基準通道模型</span>
+          <span class="text-xs bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">自律神經</span>
+        </div>
+        <code class="text-[11px] text-emerald-400 block bg-slate-950 p-1.5 rounded mb-1.5 font-mono">
+          HRV_normal = μ_7day ± 1.5 × σ_7day
+        </code>
+        <p class="text-xs text-slate-400">
+          動態常態分佈通道演算法。排除單日單點偏差，利用過去 7 日滾動中位數精確判定是否觸發「黃燈減量」或「綠燈放行」。
+        </p>
+        <div class="mt-2 text-right">
+          <a href="https://pubmed.ncbi.nlm.nih.gov/23888339/" target="_blank" onclick="event.stopPropagation()" class="text-[11px] text-sky-400 hover:underline">📄 Plews et al. (2013) Sports Med ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMN 3: 沙盤推演與戰術決策輸出 (4 cols) -->
+    <div class="lg:col-span-4 flex flex-col gap-3">
+      <div class="flex items-center justify-between border-b border-amber-900/40 pb-2">
+        <h2 class="text-base font-bold text-amber-400 flex items-center gap-2">
+          <span>🎯</span> 沙盤推演與戰術決策 (Outputs)
+        </h2>
+        <span class="text-xs text-slate-500">戰情落地指示</span>
+      </div>
+
+      <!-- Output Nodes -->
+      <div id="node-z2zone" onclick="selectNode('z2zone')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-amber-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-amber-300">神聖 Zone 2 守備區間</span>
+          <span class="text-xs bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800/50">149～165 bpm</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          路格教練心率最高防線。平地河堤巡航禁止超速，保證粒線體高密度增生且不產生乳酸債。
+        </p>
+      </div>
+
+      <div id="node-mp" onclick="selectNode('mp')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-amber-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-amber-300">台北馬 MP 目標配速</span>
+          <span class="text-xs bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800/50">5:18～5:20 /km</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          由 VDOT 48～50 跑力推算之 Sub-3:45 巡航目標速度；前 30K 守於 176 bpm 內。
+        </p>
+      </div>
+
+      <div id="node-pred" onclick="selectNode('pred')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-amber-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-amber-300">大賽預測完賽成績</span>
+          <span class="text-xs bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800/50">3:44:50 (Sub-3:45)</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Riegel 模型外推 42.195K 完賽時間，並依據河堤長距離 LSD 步幅衰減修正指數。
+        </p>
+      </div>
+
+      <div id="node-gapout" onclick="selectNode('gapout')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-amber-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-amber-300">社區上坡等效配速 (GAP)</span>
+          <span class="text-xs bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800/50">7:15 等效 5:20</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          消除坡度虛榮心態。讓跑者知道上坡 7:15 絕不是「掉速」，而是維持 MP 等效推蹬負載。
+        </p>
+      </div>
+
+      <div id="node-stop阀" onclick="selectNode('stop阀')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-amber-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-amber-300">動態折返煞車閥 (Stop-Loss)</span>
+          <span class="text-xs bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800/50">7K 決策點</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          當晨脈偏高或後段心率漂移超過 5% 時，系統觸發「安全保護閥」，終止長跑避免自律神經透支。
+        </p>
+      </div>
+
+      <div id="node-gsheetout" onclick="selectNode('gsheetout')" class="node-item bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-amber-500 transition-all-custom">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-bold text-sm text-amber-300">Google Sheet F 欄實跑回填</span>
+          <span class="text-xs bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800/50">99分 A+ 頂規</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          PDCA 閉環核心。將實際跑完之能耗比、配速心率及教練評定寫回試算表，做為下週期調課基線。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下方互動詳解面板 (Dynamic Explainer Panel) -->
+  <div id="explainer-panel" class="max-w-7xl mx-auto bg-slate-900 border border-emerald-500/40 rounded-2xl p-5 mb-8 shadow-xl">
+    <div class="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-slate-800 gap-2">
+      <div class="flex items-center gap-3">
+        <span id="exp-icon" class="text-2xl">🔍</span>
+        <div>
+          <h3 id="exp-title" class="text-lg font-bold text-emerald-400">請點擊上方任一節點，檢視其連動機制與數學公式</h3>
+          <span id="exp-category" class="text-xs text-slate-400">目前顯示：系統概覽模式</span>
+        </div>
+      </div>
+      <div id="exp-badge" class="hidden text-xs bg-emerald-950 text-emerald-300 border border-emerald-800/60 px-3 py-1 rounded-full">
+        連動關係中
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-5 mt-4 text-xs leading-relaxed">
+      <div class="md:col-span-7">
+        <h4 class="font-bold text-slate-300 mb-1">📌 運動生理作用原理 (Physiological Mechanism)</h4>
+        <p id="exp-mechanism" class="text-slate-400">
+          本系統不是單純的碼表或里程記錄器，而是一套基於運動生理學與人體力學的「動態回饋閉環系統」。左側輸入每位跑者獨一無二的生理基線，中段經過 8 大經典數學方程式交叉驗證，右側輸出客製化配速、心率防線與賽事推演。
+        </p>
+
+        <h4 class="font-bold text-slate-300 mt-3 mb-1">📐 核心數學演算法公式 (Mathematical Formulation)</h4>
+        <div id="exp-formula" class="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-emerald-300 text-xs">
+          HR_reserve = Max_HR - Rest_HR<br>
+          Zone2_range = [Rest_HR + 0.60·HR_reserve, Rest_HR + 0.75·HR_reserve]
+        </div>
+      </div>
+
+      <div class="md:col-span-5 bg-slate-950/70 p-4 rounded-xl border border-slate-800 flex flex-col justify-between">
+        <div>
+          <h4 class="font-bold text-slate-300 mb-2 flex items-center gap-1.5">
+            <span>📚</span> 權威學術論文與文獻依據
+          </h4>
+          <div id="exp-links" class="space-y-2 text-slate-400">
+            <div>• Karvonen, M. J. et al. (1957). <em>The effects of training on heart rate.</em> Ann Med Exp Biol Fenn.</div>
+            <div>• Daniels, J. (2014). <em>Daniels' Running Formula</em>, 3rd/4th Editions. Human Kinetics.</div>
+            <div>• Riegel, P. S. (1981). <em>Athletic records and human endurance.</em> American Scientist.</div>
+          </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+          雙教練會診協議遵循運動生理學協會 (ACSM) 與 Firstbeat 運動科技標準。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 即時參數試算模擬器 (Live Interactive Mini-Calculator) -->
+  <div class="max-w-7xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xl">🧮</span>
+        <h3 class="text-base font-bold text-slate-200">即時參數連動試算器 (Live Parameter Cascader)</h3>
+      </div>
+      <span class="text-xs text-slate-500">拖動下方滑桿，即時觀測公式連動推導</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+      <!-- Sliders -->
+      <div class="space-y-3.5">
+        <div>
+          <div class="flex justify-between text-slate-300 font-semibold mb-1">
+            <span>年齡 (Age)：</span>
+            <span id="val-age" class="text-sky-400">45 歲</span>
+          </div>
+          <input type="range" id="input-age" min="20" max="70" value="45" class="w-full accent-sky-400" oninput="recalculate()">
+        </div>
+
+        <div>
+          <div class="flex justify-between text-slate-300 font-semibold mb-1">
+            <span>靜息心率 (RHR)：</span>
+            <span id="val-rhr" class="text-sky-400">57 bpm</span>
+          </div>
+          <input type="range" id="input-rhr" min="40" max="80" value="57" class="w-full accent-sky-400" oninput="recalculate()">
+        </div>
+
+        <div>
+          <div class="flex justify-between text-slate-300 font-semibold mb-1">
+            <span>最大心率 (Max HR)：</span>
+            <span id="val-maxhr" class="text-sky-400">200 bpm</span>
+          </div>
+          <input type="range" id="input-maxhr" min="165" max="215" value="200" class="w-full accent-sky-400" oninput="recalculate()">
+        </div>
+      </div>
+
+      <!-- Sliders 2 -->
+      <div class="space-y-3.5">
+        <div>
+          <div class="flex justify-between text-slate-300 font-semibold mb-1">
+            <span>半馬基準成績 (HM PB)：</span>
+            <span id="val-hm" class="text-sky-400">2:01:08</span>
+          </div>
+          <input type="range" id="input-hm" min="80" max="160" value="121" class="w-full accent-sky-400" oninput="recalculate()">
+        </div>
+
+        <div>
+          <div class="flex justify-between text-slate-300 font-semibold mb-1">
+            <span>地形坡度 (Slope Grade)：</span>
+            <span id="val-slope" class="text-sky-400">+6.0% (社區上坡)</span>
+          </div>
+          <input type="range" id="input-slope" min="-8" max="15" value="6" step="0.5" class="w-full accent-sky-400" oninput="recalculate()">
+        </div>
+
+        <div>
+          <div class="flex justify-between text-slate-300 font-semibold mb-1">
+            <span>實跑配速 (Pace)：</span>
+            <span id="val-pace" class="text-sky-400">7:15 /km</span>
+          </div>
+          <input type="range" id="input-pace" min="300" max="500" value="435" step="5" class="w-full accent-sky-400" oninput="recalculate()">
+        </div>
+      </div>
+
+      <!-- Live Calculation Results -->
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2.5">
+        <div class="text-slate-400 font-bold border-b border-slate-800 pb-1.5 flex justify-between">
+          <span>即時推導產出 (Live Outputs)</span>
+          <span class="text-emerald-400 text-[10px]">即時連動中</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">儲備心率 (HRR)：</span>
+          <span id="calc-hrr" class="font-bold text-sky-400">143 bpm</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">神聖 Zone 2 範圍：</span>
+          <span id="calc-z2" class="font-bold text-emerald-400">143 ～ 164 bpm</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Daniels VDOT 跑力：</span>
+          <span id="calc-vdot" class="font-bold text-amber-400">37.8 (預估)</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Riegel 全馬推估：</span>
+          <span id="calc-fm" class="font-bold text-amber-400">4 小時 12 分</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Minetti 等效平地配速 (GAP)：</span>
+          <span id="calc-gap" class="font-bold text-emerald-400">5:22 /km (平地等效)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 節點關係對照字典 (Graph Dependency Graph)
+    const nodeRelations = {
+      // Inputs
+      'age': {
+        title: '年齡 (Age) 生理影響模型',
+        icon: '👤',
+        category: '輸入參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['karvonen', 'banister', 'z2zone'],
+        mechanism: '年齡主要影響人體最大心率自然衰減係數（Tanaka 公式：208 - 0.7 × 年齡；Gellish 公式：207 - 0.7 × 年齡），並透過儲備心率公式影響 Zone 2 天花板；在 Banister TRIMP 中，男性與女性年齡加權指數會改變疲勞累積速度。',
+        formula: 'Tanaka_MaxHR = 208 - (0.7 × Age)\nHRR = Tanaka_MaxHR - Rest_HR\nTRIMP_Y = 0.64 · e^(1.92 · ΔHR)',
+        links: [
+          '• Tanaka, H. et al. (2001). Age-predicted maximal heart rate revisited. JACC.',
+          '• Gellish, R. L. et al. (2007). Longitudinal Modeling of the Relationship between Age and Maximal Heart Rate. MSSE.',
+          '• Banister, E. W. (1991). Modeling Elite Athletic Performance.'
+        ]
+      },
+      'rhr': {
+        title: '靜息晨脈 (Resting Heart Rate) 監控模型',
+        icon: '💓',
+        category: '輸入參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['karvonen', 'banister', 'plews', 'z2zone', 'stop阀'],
+        mechanism: '靜息晨脈直接反映心肌每搏輸出量 (Stroke Volume) 與副交感神經張力。若連續兩日晨脈偏高 +5~7 bpm，代表神經系統過度疲勞未恢復，系統會自動在週日課表啟動「7K 動態折返安全閥門」。',
+        formula: 'HRR = Max_HR - Rest_HR\nZone2_Lower = Rest_HR + 0.60 · HRR\nZone2_Upper = Rest_HR + 0.75 · HRR',
+        links: [
+          '• Karvonen, M. J. et al. (1957). The effects of training on heart rate.',
+          '• Buchheit, M. (2014). Monitoring training status with HR measures. Front Physiol.'
+        ]
+      },
+      'maxhr': {
+        title: '最大心率 (Max HR) 絕對防線',
+        icon: '🔥',
+        category: '輸入參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['karvonen', 'banister', 'z2zone'],
+        mechanism: '最大心率是心血管運動強度的絕對極限，為所有百分比分區與儲備心率計算的分母天花板。Edward 實測極限為 200~210 bpm，大幅拓寬了有氧巡航的儲備心率 (HRR) 彈性。',
+        formula: 'ΔHRratio = (HR_ex - Rest_HR) / (Max_HR - Rest_HR)\nZone_pct = HR / Max_HR',
+        links: [
+          '• ACSM\'s Guidelines for Exercise Testing and Prescription (11th Ed).'
+        ]
+      },
+      'lthr': {
+        title: '乳酸閾值心率 (LTHR) 能量分界',
+        icon: '⚡',
+        category: '輸入參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['karvonen', 'daniels', 'stamina', 'z2zone', 'mp'],
+        mechanism: '乳酸閾值代表血液乳酸濃度達到平衡（約 4.0 mmol/L）的最大強度。神聖 Zone 2 的上限由 LTHR × 85%~89% 嚴格錨定（Edward 為 163~165 bpm），一旦突破此防線，體能消耗即由脂肪氧化切換為高耗能的糖原酵解。',
+        formula: 'Zone2_Ceiling = LTHR × 0.89\nZone4_Threshold = LTHR × 1.00 ± 2%',
+        links: [
+          '• Friel, J. (2009). The Triathlete\'s Training Bible. VeloPress.',
+          '• Coggan, A. R. Training and Racing with a Power Meter.'
+        ]
+      },
+      'pb': {
+        title: '賽事實績 (Race PB) 跑力錨定點',
+        icon: '🏆',
+        category: '輸入參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['daniels', 'riegel', 'mp', 'pred'],
+        mechanism: '實際比賽成就是消除所有實驗室理論誤差的最真實依據。長榮半馬 2:01:08 成績餵入後，系統可自動精準推導出當前真實 VDOT 跑力，並使用 Riegel 冪定律推演台北馬 Sub-3:45 戰略。',
+        formula: 'T_full = T_half × (42.195 / 21.0975)^1.06\nMP_target = T_full / 42.195',
+        links: [
+          '• Riegel, P. S. (1981). Athletic records and human endurance.',
+          '• Daniels, J. (2014). Daniels\' Running Formula.'
+        ]
+      },
+      'slope': {
+        title: '地形坡度與爬升 (Grade & Ascent)',
+        icon: '⛰️',
+        category: '輸入參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['minetti', 'gapout'],
+        mechanism: '社區環線單圈爬升 25 公尺、均坡 6%，人體對抗重力需要額外招募快縮肌纖維推蹬。Minetti 方程式計算出上坡每增加 1% 坡度，每公斤每公尺能耗增加約 1.5 焦耳，說明了社區上坡心率飆升是天然肌力訓練。',
+        formula: 'C_r = 155.4·i⁵ - 30.4·i⁴ - 32.8·i³ + 43.1·i² + 21.5·i + 3.6 (J/kg/m)\nGAP = Pace_actual / (C_r / C_flat)',
+        links: [
+          '• Minetti, A. E. et al. (2002). Energy cost of walking and running on extreme slopes. J Appl Physiol.'
+        ]
+      },
+      'hrv': {
+        title: '夜間 HRV (rMSSD) 與自律神經狀態',
+        icon: '🌙',
+        category: '輸入參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['plews', 'stop阀'],
+        mechanism: 'HRV (心率變異度) 反映副交感神經對心跳間隔的調節能力。當長榮賽後或衝刺課表後神經疲勞時，HRV 下降（如跌至 30ms），系統會主動建議「降階為 Zone 1 輕慢跑」或啟動 7K 安全折返。',
+        formula: 'rMSSD = sqrt( (1/(N-1)) · ∑(RR_{i+1} - RR_i)² )\nZ_score = (ln_rMSSD - μ_7d) / σ_7d',
+        links: [
+          '• Plews, D. J. et al. (2013). Training adaptation and heart rate variability in elite endurance athletes. Sports Med.'
+        ]
+      },
+      'gait': {
+        title: '步態動力學 (Cadence, GCT, VO)',
+        icon: '🏃',
+        category: '輸入參數 ➡️ 影響模型',
+        upstream: [],
+        downstream: ['decoupling', 'stamina', 'gsheetout'],
+        mechanism: '步頻 (187 spm)、觸地時間 (245 ms) 與左右平衡 (49.7:50.3) 反映下肢彈簧剛性與跑步經濟性。當疲勞累積時，GCT 會拉長至 260ms 以上、步頻下降，能量浪費在煞車衝擊中。',
+        formula: 'Speed = Cadence × Stride_Length\nVertical_Ratio = (Vertical_Osc / Stride_Length) × 100%\nLeg_Stiffness = F_max / ΔL',
+        links: [
+          '• Cavanagh, P. R. & Lafortune, M. A. (1980). Ground reaction forces in distance running. J Biomech.'
+        ]
+      },
+
+      // Models
+      'karvonen': {
+        title: 'Karvonen 儲備心率與 Friel 區間模型',
+        icon: '💓',
+        category: '核心計算模型',
+        upstream: ['age', 'rhr', 'maxhr', 'lthr'],
+        downstream: ['z2zone'],
+        mechanism: '排除一般公式忽略靜息心率的缺陷，採用「儲備心率 (HRR)」依據真實血管動態劃分 Zone 1~5。路格教練將 Zone 2 定義在 149~165 bpm，是全馬燃脂與粒線體增生的最有效金牌區間。',
+        formula: 'HR_target = Rest_HR + (Max_HR - Rest_HR) × Intensity%\nZone 1: 50%~60% HRR\nZone 2: 60%~75% HRR (神聖鎖定)\nZone 4: 85%~90% HRR',
+        links: [
+          '• Karvonen, M. J., Kentala, E., & Mustala, O. (1957). Ann Med Exp Biol Fenn.',
+          '• Friel, J. The Triathlete\'s Training Bible.'
+        ]
+      },
+      'daniels': {
+        title: 'Jack Daniels VDOT 跑力公式',
+        icon: '🏃‍♂️',
+        category: '核心計算模型',
+        upstream: ['pb', 'lthr'],
+        downstream: ['mp', 'pred'],
+        mechanism: '美國傳奇跑步教練 Jack Daniels 博士提出的攝氧能效指標。透過單次賽事實績計算最大攝氧量利用率，反推各生理區間最適配速，避免跑太快變乳酸債、跑太慢無訓練刺激。',
+        formula: '%VO2max = 0.8 + 0.1894393·e^(-0.012778·t) + 0.2989558·e^(-0.1932605·t)\nVDOT = VO2 / %VO2max',
+        links: [
+          '• Daniels, J. (2014). Daniels\' Running Formula (3rd/4th Editions).'
+        ]
+      },
+      'riegel': {
+        title: 'Riegel 馬拉松耐力衰減與大賽推演',
+        icon: '🎯',
+        category: '核心計算模型',
+        upstream: ['pb'],
+        downstream: ['pred'],
+        mechanism: '工程師 Peter Riegel 於 1981 年提出的耐力衰減冪定律。假設人體隨著運動距離加倍，速度會因肌肉疲勞與能量枯竭衰減約 6% ($b=1.06$)。本系統用以推算台北馬拉松 Sub-3:45 的可行性。',
+        formula: 'T2 = T1 × (D2 / D1)^1.06\n若肌耐力不足 (LSD少跑) 則 b 升高至 1.08~1.10\n週期化長跑課表能將 b 壓低至 1.05~1.06',
+        links: [
+          '• Riegel, P. S. (1981). Athletic records and human endurance. American Scientist, 69(3), 285-290.'
+        ]
+      },
+      'banister': {
+        title: 'Banister TRIMP 負荷衝量與 Coggan PMC',
+        icon: '📈',
+        category: '核心計算模型',
+        upstream: ['age', 'rhr', 'maxhr'],
+        downstream: ['gsheetout'],
+        mechanism: 'Eric Banister 博士提出的生理負荷量化指標。將運動時的心率儲備比率進行指數加權（高心率負荷呈指數倍增），產出單次訓練量 (Training Impulse)，並滾動推算 42天體能 (CTL) 與 7天疲勞 (ATL)。',
+        formula: 'TRIMP = t(min) × ΔHR × 0.64e^(1.92 · ΔHR)\nCTL_today = CTL_yesterday + (TRIMP - CTL_yesterday)/42\nATL_today = ATL_yesterday + (TRIMP - ATL_yesterday)/7\nTSB = CTL - ATL (賽前目標 +15~+25)',
+        links: [
+          '• Banister, E. W. (1991). Modeling Elite Athletic Performance.',
+          '• Coggan, A. R. Training and Racing with a Power Meter.'
+        ]
+      },
+      'minetti': {
+        title: 'Minetti 坡度代謝方程式與 GAP 轉換',
+        icon: '⛰️',
+        category: '核心計算模型',
+        upstream: ['slope'],
+        downstream: ['gapout'],
+        mechanism: 'Alberto Minetti 教授在人體運動代謝經典論文中，透過呼吸測量儀測定不同坡度下的跑步能量消耗（Cost of Running, J/kg/m），建立了現代所有 GAP (Grade Adjusted Pace) 演算法的黃金標準。',
+        formula: 'C(i) = 155.4·i⁵ - 30.4·i⁴ - 32.8·i³ + 43.1·i² + 21.5·i + 3.6\nGAP_speed = Actual_speed × (C(i) / C_flat)',
+        links: [
+          '• Minetti, A. E. et al. (2002). J Appl Physiol 93: 1039-1046.'
+        ]
+      },
+      'decoupling': {
+        title: '有氧脫鉤與能效比 (Aerobic Decoupling EF)',
+        icon: '📉',
+        category: '核心計算模型',
+        upstream: ['gait'],
+        downstream: ['stop阀', 'gsheetout'],
+        mechanism: 'Joe Friel 提出的心血管穩態檢測法。在等速平坦長跑中，比較前半程與後半程的「心率 vs 速度」比值。若後半程心率飄升超過 5%，代表脫水、體溫過高或慢縮肌衰退，心血管已產生脫鉤。',
+        formula: 'EF = Normalized_Pace / Avg_HR\nDecoupling_Ratio = (EF_half1 - EF_half2) / EF_half1 × 100%\n判定標準：< 5% 卓越 (如 11/01 16K)；> 5% 需強化耐力',
+        links: [
+          '• Friel, J. (2012). The Power Meter Handbook. VeloPress.'
+        ]
+      },
+      'stamina': {
+        title: 'Firstbeat 即時體力模型 (Stamina & Glycogen)',
+        icon: '🔋',
+        category: '核心計算模型',
+        upstream: ['lthr', 'gait'],
+        downstream: ['stop阀'],
+        mechanism: 'Garmin 手錶搭載之 Firstbeat 專利演算法。將體能分為「潛在體力 (有氧脂肪氧化)」與「當前體力 (無氧乳酸/糖原)」，一旦強度跨越 LTHR，當前體力會急遽下墜，迫使配速崩盤。',
+        formula: 'Stamina_remaining = f(VO2max, LTHR, Cumulative_Work, Glycogen_Depletion)\n16K 跑完體能剩餘 56%，證明全程未跨入無氧透支。',
+        links: [
+          '• Firstbeat Analytics Science Papers: A Revolutionary Metric for Pacing.'
+        ]
+      },
+      'plews': {
+        title: 'Plews HRV 滾動基準通道模型',
+        icon: '📊',
+        category: '核心計算模型',
+        upstream: ['rhr', 'hrv'],
+        downstream: ['stop阀'],
+        mechanism: '紐西蘭運動科學家 Dan Plews 博士提出的菁英耐力運動員監控法。使用 7 日自然對數 rMSSD 之滾動平均值與標準差，建構出跑者專屬的「自律神經安全通道」，避免單次過度解讀。',
+        formula: 'Baseline_Band = [μ_7d - 1.5·σ_7d, μ_7d + 1.5·σ_7d]\n低於下限 ➡️ 副交感神經受抑，必須主動減量修復。',
+        links: [
+          '• Plews, D. J. et al. (2013). Sports Med, 43(9), 773-781.'
+        ]
+      },
+
+      // Outputs
+      'z2zone': {
+        title: '神聖 Zone 2 守備區間 (149～165 bpm)',
+        icon: '🛡️',
+        category: '戰術輸出與落地指標',
+        upstream: ['karvonen', 'age', 'rhr', 'maxhr', 'lthr'],
+        downstream: [],
+        mechanism: '保證每週 80% 的訓練量處於脂肪最大氧化率 (FatMax) 區間，刺激微血管網絡密度與粒線體生合成，建立最強固的有氧基底，絕不超速堆積乳酸。',
+        formula: 'Zone 2 鎖定：149 bpm ～ 165 bpm (上限以 LTHR × 89% 為鐵律)',
+        links: ['• San-Millán, I. & Brooks, G. A. (2018). Assessment of Metabolic Flexibility and Lactate Clearance. Sports Med.']
+      },
+      'mp': {
+        title: '台北馬 MP 目標配速 (5:18～5:20/km)',
+        icon: '🎯',
+        category: '戰術輸出與落地指標',
+        upstream: ['daniels', 'pb', 'lthr'],
+        downstream: [],
+        mechanism: 'Sub-3:45 之官方配速基準。建立跑者在此配速下的神經衝擊耐受力，並檢驗觸地時間剛性 (GCT < 240ms) 與步幅自然延展至 102~106cm。',
+        formula: 'Pace_MP = 5 min 18 sec / km\n預計 42.195K 完賽時間：3 小時 43 分 35 秒',
+        links: ['• Daniels, J. (2014). Daniels\' Running Formula.']
+      },
+      'pred': {
+        title: '大賽預測完賽成績 (Sub-3:45 戰略推演)',
+        icon: '👑',
+        category: '戰術輸出與落地指標',
+        upstream: ['riegel', 'daniels', 'pb'],
+        downstream: [],
+        mechanism: '以半馬 2:01:08 為起點，透過 8 週週期課表（社區短坡推蹬 + 平地河堤 14K~30K LSD）將疲勞指數由 1.08 壓縮至 1.055，達成全馬 Sub-3:45 的破紀錄飛躍。',
+        formula: 'Predict_Time = 121.13 × (42.195 / 21.0975)^1.058 = 224.8 分鐘 ≈ 3 小時 44 分 50 秒',
+        links: ['• Riegel, P. S. (1981). Athletic records and human endurance.']
+      },
+      'gapout': {
+        title: '社區上坡等效配速 (GAP: 7:15 等效 5:20)',
+        icon: '⛰️',
+        category: '戰術輸出與落地指標',
+        upstream: ['minetti', 'slope'],
+        downstream: [],
+        mechanism: '跑者在社區環線爬坡時，雖配速降至 7:15/km，但由於 Minetti 坡度能耗加成，心血管與肌肉代謝負荷完全等同於平地河堤 5:20/km 之 MP 輸出，消除跑者無謂的減速焦慮！',
+        formula: 'GAP = 5:20/km on +6% Slope @ 7:15/km Pace',
+        links: ['• Minetti, A. E. et al. (2002). J Appl Physiol.']
+      },
+      'stop阀': {
+        title: '動態折返安全煞車閥 (Stop-Loss Protocol)',
+        icon: '🛑',
+        category: '戰術輸出與落地指標',
+        upstream: ['plews', 'decoupling', 'stamina', 'rhr', 'hrv'],
+        downstream: [],
+        mechanism: '10/31 晨脈偏高 (63bpm) 時系統即時開立「7K 決策閥門」；若心率飄破 163 bpm 即時終止長跑，防止急性疲勞轉化為慢性過度訓練 (Overtraining Syndrome)。',
+        formula: 'IF (HR > 163 bpm AND Lap > 7K) THEN Trigger_Stop_Run()',
+        links: ['• Meeusen, R. et al. (2013). Prevention, diagnosis, and treatment of the overtraining syndrome. MSSE.']
+      },
+      'gsheetout': {
+        title: 'Google Sheet F 欄實跑摘要回填 (PDCA 閉環)',
+        icon: '📊',
+        category: '戰術輸出與落地指標',
+        upstream: ['banister', 'decoupling', 'gait'],
+        downstream: [],
+        mechanism: '完成 Plan (A-E欄) ➡️ Do & Check (F欄實跑驗證) ➡️ Act (動態微調後續課表) 的完整運動科學管理閉環，記錄配速、均心率、衝刺步頻與雙教練 99 分評定。',
+        formula: 'F_column = 【實跑驗證】距離 @ 配速 | 均心率 (Zone2) | 步頻 | 評定得分',
+        links: ['• Deming, W. E. Out of the Crisis. MIT Center for Advanced Engineering Study.']
+      }
+    };
+
+    let activeNodeId = null;
+
+    function selectNode(id) {
+      if (activeNodeId === id) {
+        resetSelection();
+        return;
+      }
+      activeNodeId = id;
+      const data = nodeRelations[id];
+      if (!data) return;
+
+      // 重置所有節點樣式
+      document.querySelectorAll('.node-item').forEach(el => {
+        el.classList.remove('glow-active', 'glow-upstream', 'glow-downstream');
+        el.classList.add('node-dim');
+      });
+
+      // 點亮當前節點
+      const targetEl = document.getElementById('node-' + id);
+      if (targetEl) {
+        targetEl.classList.remove('node-dim');
+        targetEl.classList.add('glow-active');
+      }
+
+      // 點亮上游節點
+      if (data.upstream && data.upstream.length > 0) {
+        data.upstream.forEach(upId => {
+          const upEl = document.getElementById('node-' + upId);
+          if (upEl) {
+            upEl.classList.remove('node-dim');
+            upEl.classList.add('glow-upstream');
+          }
+        });
+      }
+
+      // 點亮下游節點
+      if (data.downstream && data.downstream.length > 0) {
+        data.downstream.forEach(downId => {
+          const downEl = document.getElementById('node-' + downId);
+          if (downEl) {
+            downEl.classList.remove('node-dim');
+            downEl.classList.add('glow-downstream');
+          }
+        });
+      }
+
+      // 更新說明面板
+      document.getElementById('exp-icon').textContent = data.icon || '🔍';
+      document.getElementById('exp-title').textContent = data.title;
+      document.getElementById('exp-category').textContent = '類別：' + data.category;
+      document.getElementById('exp-mechanism').textContent = data.mechanism;
+      document.getElementById('exp-formula').innerHTML = (data.formula || '').replace(/\n/g, '<br>');
+      
+      const linksContainer = document.getElementById('exp-links');
+      linksContainer.innerHTML = '';
+      if (data.links && data.links.length > 0) {
+        data.links.forEach(linkText => {
+          const d = document.createElement('div');
+          d.innerHTML = linkText;
+          linksContainer.appendChild(d);
+        });
+      }
+
+      document.getElementById('exp-badge').classList.remove('hidden');
+      document.getElementById('explainer-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function resetSelection() {
+      activeNodeId = null;
+      document.querySelectorAll('.node-item').forEach(el => {
+        el.classList.remove('glow-active', 'glow-upstream', 'glow-downstream', 'node-dim');
+      });
+      document.getElementById('exp-icon').textContent = '🔍';
+      document.getElementById('exp-title').textContent = '請點擊上方任一節點，檢視其連動機制與數學公式';
+      document.getElementById('exp-category').textContent = '目前顯示：系統概覽模式';
+      document.getElementById('exp-mechanism').textContent = '本系統不是單純的碼表或里程記錄器，而是一套基於運動生理學與人體力學的「動態回饋閉環系統」。左側輸入每位跑者獨一無二的生理基線，中段經過 8 大經典數學方程式交叉驗證，右側輸出客製化配速、心率防線與賽事推演。';
+      document.getElementById('exp-formula').innerHTML = 'HR_reserve = Max_HR - Rest_HR<br>Zone2_range = [Rest_HR + 0.60·HR_reserve, Rest_HR + 0.75·HR_reserve]';
+      document.getElementById('exp-badge').classList.add('hidden');
+    }
+
+    // 即時模擬計算器運算邏輯
+    function recalculate() {
+      const age = parseInt(document.getElementById('input-age').value);
+      const rhr = parseInt(document.getElementById('input-rhr').value);
+      const maxhr = parseInt(document.getElementById('input-maxhr').value);
+      const hmMinutes = parseInt(document.getElementById('input-hm').value);
+      const slope = parseFloat(document.getElementById('input-slope').value);
+      const paceSec = parseInt(document.getElementById('input-pace').value);
+
+      // 更新滑桿顯示
+      document.getElementById('val-age').textContent = age + ' 歲';
+      document.getElementById('val-rhr').textContent = rhr + ' bpm';
+      document.getElementById('val-maxhr').textContent = maxhr + ' bpm';
+      
+      const hmH = Math.floor(hmMinutes / 60);
+      const hmM = hmMinutes % 60;
+      document.getElementById('val-hm').textContent = `${hmH}:${hmM < 10 ? '0' : ''}${hmM}:00`;
+      
+      document.getElementById('val-slope').textContent = (slope >= 0 ? '+' : '') + slope.toFixed(1) + '%';
+      
+      const paceM = Math.floor(paceSec / 60);
+      const paceS = paceSec % 60;
+      document.getElementById('val-pace').textContent = `${paceM}:${paceS < 10 ? '0' : ''}${paceS} /km`;
+
+      // 1. HRR 計算
+      const hrr = Math.max(10, maxhr - rhr);
+      document.getElementById('calc-hrr').textContent = hrr + ' bpm';
+
+      // 2. Zone 2 (60% ~ 75% HRR)
+      const z2Min = Math.round(rhr + hrr * 0.60);
+      const z2Max = Math.round(rhr + hrr * 0.75);
+      document.getElementById('calc-z2').textContent = `${z2Min} ～ ${z2Max} bpm`;
+
+      // 3. VDOT 預估
+      const vKmh = 21.0975 / (hmMinutes / 60);
+      const vMeterMin = (vKmh * 1000) / 60;
+      const vo2 = -4.60 + 0.182258 * vMeterMin + 0.000104 * Math.pow(vMeterMin, 2);
+      const pctMax = 0.8 + 0.1894393 * Math.exp(-0.012778 * hmMinutes) + 0.2989558 * Math.exp(-0.1932605 * hmMinutes);
+      const vdot = (vo2 / pctMax).toFixed(1);
+      document.getElementById('calc-vdot').textContent = `${vdot} (跑力)`;
+
+      // 4. Riegel 全馬推估 (T2 = T1 * (42.195/21.0975)^1.058)
+      const fmMinutes = hmMinutes * Math.pow(42.195 / 21.0975, 1.058);
+      const fmH = Math.floor(fmMinutes / 60);
+      const fmM = Math.round(fmMinutes % 60);
+      document.getElementById('calc-fm').textContent = `${fmH} 小時 ${fmM} 分`;
+
+      // 5. Minetti GAP 等效配速
+      const i = slope / 100.0;
+      const cr = 155.4 * Math.pow(i, 5) - 30.4 * Math.pow(i, 4) - 32.8 * Math.pow(i, 3) + 43.1 * Math.pow(i, 2) + 21.5 * i + 3.6;
+      const crFlat = 3.6;
+      const costRatio = Math.max(0.6, cr / crFlat);
+      const gapSec = paceSec / costRatio;
+      const gapM = Math.floor(gapSec / 60);
+      const gapS = Math.round(gapSec % 60);
+      document.getElementById('calc-gap').textContent = `${gapM}:${gapS < 10 ? '0' : ''}${gapS} /km (等效平地)`;
+    }
+
+    // 初始載入運算
+    window.onload = function() {
+      recalculate();
+    };
+  </script>
+</body>
+</html>
