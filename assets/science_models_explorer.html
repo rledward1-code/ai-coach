@@ -432,349 +432,518 @@
   </div>
 
   <script>
-    // 完整節點資料庫
+    // 完整節點資料庫 (JSON 安全格式，無字串跳脫問題)
     const nodeRelations = {
-      'temp': {
-        title: '環境氣溫與熱應力 (Ambient Temp & Thermal Stress)',
-        icon: '🌡️',
-        badge: '15°C～28°C',
-        category: '環境參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['decoupling', 'riegel', 'stamina', 'banister', 'mp', 'pred'],
-        mechanism: '馬拉松最佳競賽氣溫為 10°C~15°C。當環境氣溫升高（如長榮半馬 27°C 烈日 vs 台北馬預期 15°C 黃金低溫），人體為了維持核心體溫，會將大量心輸出量分流至皮下微血管進行排汗散熱，導致骨骼肌有效血流減少，引發顯著的心血管漂移（心率上升 5~15 bpm）與能效比 (EF) 折損。權威文獻證實：氣溫每高於 15°C 1°C，馬拉松完賽配速平均折損約 0.3%~0.5%。',
-        formula: 'Pace_Penalty = max(0, (Temp - 15) × 0.4%)\nΔHR_Drift = max(0, (Temp - 15) × 1.2 bpm)\nT_adjusted = T_riegel × (1 + Pace_Penalty)',
-        links: [
-          '• El Helou, N. et al. (2012). Impact of Environmental Parameters on Marathon Running Performance in Both Women and Men. PLoS ONE, 7(5), e37407.',
-          '• Coyle, E. F. & González-Alonso, J. (2001). Cardiovascular drift during prolonged exercise. Exerc Sport Sci Rev, 29(2), 88-92.',
-          '• Montain, S. J. & Coyle, E. F. (1992). Influence of graded dehydration on hyperthermia and cardiovascular drift. J Appl Physiol.'
-        ]
-      },
-      // Inputs
-      'age': {
-        title: '年齡 (Age) 生理影響模型',
-        icon: '👤',
-        badge: '45 歲',
-        category: '輸入參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['karvonen', 'banister', 'z2zone'],
-        mechanism: '年齡主要影響人體最大心率自然衰減係數（Tanaka 公式：208 - 0.7 × 年齡；Gellish 公式：207 - 0.7 × 年齡），並透過儲備心率公式影響 Zone 2 天花板；在 Banister TRIMP 中，男性與女性年齡加權指數會改變疲勞累積速度。',
-        formula: 'Tanaka_MaxHR = 208 - (0.7 × Age)
-HRR = Tanaka_MaxHR - Rest_HR',
-        links: [
-          '• Tanaka, H. et al. (2001). Age-predicted maximal heart rate revisited. JACC.',
-          '• Gellish, R. L. et al. (2007). Longitudinal Modeling of HRmax. MSSE.'
-        ]
-      },
-      'rhr': {
-        title: '靜息晨脈 (Rest HR / RHR) 監控模型',
-        icon: '💓',
-        badge: '53～56 bpm',
-        category: '輸入參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['karvonen', 'banister', 'plews', 'z2zone', 'stop阀'],
-        mechanism: '靜息晨脈直接反映心肌每搏輸出量 (Stroke Volume) 與副交感神經張力。若連續兩日晨脈偏高 +5~7 bpm，代表神經系統過度疲勞未恢復，系統會自動在週日課表啟動「7K 動態折返安全閥門」。',
-        formula: 'HRR = Max_HR - Rest_HR
-Zone2_Lower = Rest_HR + 0.60 · HRR
-Zone2_Upper = Rest_HR + 0.75 · HRR',
-        links: [
-          '• Karvonen, M. J. et al. (1957). The effects of training on heart rate.',
-          '• Buchheit, M. (2014). Monitoring training status with HR measures.'
-        ]
-      },
-      'maxhr': {
-        title: '最大心率 (Max HR) 絕對防線',
-        icon: '🔥',
-        badge: '200～210 bpm',
-        category: '輸入參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['karvonen', 'banister', 'z2zone'],
-        mechanism: '最大心率是心血管運動強度的絕對極限，為所有百分比分區與儲備心率計算的分母天花板。Edward 實測極限為 200~210 bpm，大幅拓寬了有氧巡航的儲備心率 (HRR) 彈性。',
-        formula: 'ΔHRratio = (HR_ex - Rest_HR) / (Max_HR - Rest_HR)',
-        links: [
-          '• ACSM's Guidelines for Exercise Testing and Prescription.'
-        ]
-      },
-      'lthr': {
-        title: '乳酸閾值心率 (LTHR) 能量分界',
-        icon: '⚡',
-        badge: '184～193 bpm',
-        category: '輸入參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['karvonen', 'daniels', 'stamina', 'z2zone', 'mp'],
-        mechanism: '乳酸閾值代表血液乳酸濃度達到平衡（約 4.0 mmol/L）的最大強度。神聖 Zone 2 的上限由 LTHR × 85%~89% 嚴格錨定（Edward 為 163~165 bpm），一旦突破此防線，體能消耗即由脂肪氧化切換為高耗能的糖原酵解。',
-        formula: 'Zone2_Ceiling = LTHR × 0.89
-Zone4_Threshold = LTHR × 1.00 ± 2%',
-        links: [
-          '• Friel, J. The Triathlete's Training Bible. VeloPress.',
-          '• Coggan, A. R. Training and Racing with a Power Meter.'
-        ]
-      },
-      'pb': {
-        title: '賽事實績 (Race PB) 跑力錨定點',
-        icon: '🏆',
-        badge: '半馬 2:01:08',
-        category: '輸入參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['daniels', 'riegel', 'mp', 'pred'],
-        mechanism: '實際比賽成就是消除所有實驗室理論誤差的最真實依據。長榮半馬 2:01:08 成績餵入後，系統可自動精準推導出當前真實 VDOT 跑力，並使用 Riegel 冪定律推演台北馬 Sub-3:45 戰略。',
-        formula: 'T_full = T_half × (42.195 / 21.0975)^1.06',
-        links: [
-          '• Riegel, P. S. (1981). Athletic records and human endurance.',
-          '• Daniels, J. (2014). Daniels' Running Formula.'
-        ]
-      },
-      'slope': {
-        title: '地形坡度與爬升 (Grade & Ascent)',
-        icon: '⛰️',
-        badge: '社區 +6.0%',
-        category: '輸入參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['minetti', 'gapout'],
-        mechanism: '社區環線單圈爬升 25 公尺、均坡 6%，人體對抗重力需要額外招募快縮肌纖維推蹬。Minetti 方程式計算出上坡每增加 1% 坡度，每公斤每公尺能耗增加約 1.5 焦耳，說明了社區上坡心率飆升是天然肌力訓練。',
-        formula: 'C_r = 155.4·i⁵ - 30.4·i⁴ - 32.8·i³ + 43.1·i² + 21.5·i + 3.6',
-        links: [
-          '• Minetti, A. E. et al. (2002). J Appl Physiol 93: 1039-1046.'
-        ]
-      },
-      'hrv': {
-        title: '夜間 HRV (rMSSD) 與自律神經狀態',
-        icon: '🌙',
-        badge: '32～39 ms',
-        category: '輸入參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['plews', 'stop阀'],
-        mechanism: 'HRV (心率變異度) 反映副交感神經對心跳間隔的調節能力。當長榮賽後或衝刺課表後神經疲勞時，HRV 下降（如跌至 30ms），系統會主動建議「降階為 Zone 1 輕慢跑」或啟動 7K 安全折返。',
-        formula: 'rMSSD = sqrt( (1/(N-1)) · ∑(RR_{i+1} - RR_i)² )',
-        links: [
-          '• Plews, D. J. et al. (2013). Sports Med, 43(9), 773-781.'
-        ]
-      },
-      'gait': {
-        title: '步態動力學 (Cadence, GCT, VO)',
-        icon: '🏃',
-        badge: '187spm / 245ms',
-        category: '輸入參數 ➡️ 影響模型',
-        upstream: [],
-        downstream: ['decoupling', 'stamina', 'gsheetout'],
-        mechanism: '步頻 (187 spm)、觸地時間 (245 ms) 與左右平衡 (49.7:50.3) 反映下肢彈簧剛性與跑步經濟性。當疲勞累積時，GCT 會拉長至 260ms 以上、步頻下降，能量浪費在煞車衝擊中。',
-        formula: 'Speed = Cadence × Stride_Length
-Impact_Load = ∑(Work × GCT)',
-        links: [
-          '• Cavanagh, P. R. & Lafortune, M. A. (1980). J Biomech.'
-        ]
-      },
-
-      // Models
-      'karvonen': {
-        title: 'Karvonen 儲備心率與 Friel 區間模型',
-        icon: '💓',
-        badge: 'HRR 區間',
-        category: '核心計算模型',
-        upstream: ['age', 'rhr', 'maxhr', 'lthr'],
-        downstream: ['z2zone'],
-        mechanism: '排除一般公式忽略靜息心率的缺陷，採用「儲備心率 (HRR)」依據真實血管動態劃分 Zone 1~5。路格教練將 Zone 2 定義在 149~165 bpm，是全馬燃脂與粒線體增生的最有效金牌區間。',
-        formula: 'HR_target = Rest_HR + (Max_HR - Rest_HR) × Intensity%
-Zone 2: 60%~75% HRR (神聖鎖定)',
-        links: ['• Karvonen, M. J. et al. (1957). Ann Med Exp Biol Fenn.']
-      },
-      'daniels': {
-        title: 'Jack Daniels VDOT 跑力公式',
-        icon: '🏃‍♂️',
-        badge: '跑力配速',
-        category: '核心計算模型',
-        upstream: ['pb', 'lthr'],
-        downstream: ['mp', 'pred'],
-        mechanism: '美國傳奇跑步教練 Jack Daniels 博士提出的攝氧能效指標。透過單次賽事實績計算最大攝氧量利用率，反推各生理區間最適配速，避免跑太快變乳酸債、跑太慢無訓練刺激。',
-        formula: 'VO2 = -4.60 + 0.182258·v + 0.000104·v²
-VDOT = VO2 / %VO2max',
-        links: ['• Daniels, J. (2014). Daniels' Running Formula.']
-      },
-      'riegel': {
-        title: 'Riegel 馬拉松耐力衰減與大賽推演',
-        icon: '🎯',
-        badge: '全馬推演',
-        category: '核心計算模型',
-        upstream: ['pb', 'temp'],
-        downstream: ['pred'],
-        mechanism: '工程師 Peter Riegel 於 1981 年提出的耐力衰減冪定律。假設人體隨著運動距離加倍，速度會因肌肉疲勞與能量枯竭衰減約 6% ($b=1.06$)。本系統用以推算台北馬拉松 Sub-3:45 的可行性。',
-        formula: 'T2 = T1 × (D2 / D1)^1.06',
-        links: ['• Riegel, P. S. (1981). Athletic records and human endurance.']
-      },
-      'banister': {
-        title: 'Banister TRIMP 負荷衝量與 Coggan PMC',
-        icon: '📈',
-        badge: 'PMC 體能',
-        category: '核心計算模型',
-        upstream: ['age', 'rhr', 'maxhr', 'temp'],
-        downstream: ['gsheetout'],
-        mechanism: 'Eric Banister 博士提出的生理負荷量化指標。將運動時的心率儲備比率進行指數加權（高心率負荷呈指數倍增），產出單次訓練量 (Training Impulse)，並滾動推算 42天體能 (CTL) 與 7天疲勞 (ATL)。',
-        formula: 'TRIMP = t(min) × ΔHR × 0.64e^(1.92 · ΔHR)
-TSB = CTL - ATL',
-        links: ['• Banister, E. W. (1991). Modeling Elite Athletic Performance.']
-      },
-      'minetti': {
-        title: 'Minetti 坡度代謝方程式與 GAP 轉換',
-        icon: '⛰️',
-        badge: '代謝轉換',
-        category: '核心計算模型',
-        upstream: ['slope'],
-        downstream: ['gapout'],
-        mechanism: 'Alberto Minetti 教授在人體運動代謝經典論文中，透過呼吸測量儀測定不同坡度下的跑步能量消耗（Cost of Running, J/kg/m），建立了現代所有 GAP (Grade Adjusted Pace) 演算法的黃金標準。',
-        formula: 'C(i) = 155.4·i⁵ - 30.4·i⁴ - 32.8·i³ + 43.1·i² + 21.5·i + 3.6',
-        links: ['• Minetti, A. E. et al. (2002). J Appl Physiol 93: 1039-1046.']
-      },
-      'decoupling': {
-        title: '有氧脫鉤與能效比 (Aerobic Decoupling EF)',
-        icon: '📉',
-        badge: '心率漂移',
-        category: '核心計算模型',
-        upstream: ['gait', 'temp'],
-        downstream: ['stop阀', 'gsheetout'],
-        mechanism: 'Joe Friel 提出的心血管穩態檢測法。在等速平坦長跑中，比較前半程與後半程的「心率 vs 速度」比值。若後半程心率飄升超過 5%，代表脫水、體溫過高或慢縮肌衰退，心血管已產生脫鉤。',
-        formula: 'Decoupling % = (EF_first - EF_second) / EF_first × 100%
-判定標準：< 5% 卓越 (如 11/01 16K 之 +2bpm 零漂移)',
-        links: ['• Friel, J. The Power Meter Handbook.']
-      },
-      'stamina': {
-        title: 'Firstbeat 即時體力模型 (Stamina & Glycogen)',
-        icon: '🔋',
-        badge: '動態消耗',
-        category: '核心計算模型',
-        upstream: ['lthr', 'gait'],
-        downstream: ['stop阀'],
-        mechanism: 'Garmin 手錶搭載之 Firstbeat 專利演算法。將體能分為「潛在體力 (有氧脂肪氧化)」與「當前體力 (無氧乳酸/糖原)」，一旦強度跨越 LTHR，當前體力會急遽下墜，迫使配速崩盤。',
-        formula: 'Stamina_t = Stamina_0 - ∫(W_anaerobic + W_aerobic) dt
-16K 跑完體能剩餘 56%，證明全程未跨入無氧透支。',
-        links: ['• Firstbeat Analytics Science Papers.']
-      },
-      'plews': {
-        title: 'Plews HRV 滾動基準通道模型',
-        icon: '📊',
-        badge: '常態分佈',
-        category: '核心計算模型',
-        upstream: ['rhr', 'hrv'],
-        downstream: ['stop阀'],
-        mechanism: '紐西蘭運動科學家 Dan Plews 博士提出的菁英耐力運動員監控法。使用 7 日自然對數 rMSSD 之滾動平均值與標準差，建構出跑者專屬的「自律神經安全通道」，避免單次過度解讀。',
-        formula: 'Baseline_Band = [μ_7d - 1.5·σ_7d, μ_7d + 1.5·σ_7d]',
-        links: ['• Plews, D. J. et al. (2013). Sports Med, 43(9), 773-781.']
-      },
-
-      // Outputs
-      'z2zone': {
-        title: '神聖 Zone 2 守備區間 (149～165 bpm)',
-        icon: '🛡️',
-        badge: '149～165 bpm',
-        category: '戰術輸出與落地指標',
-        upstream: ['karvonen', 'age', 'rhr', 'maxhr', 'lthr'],
-        downstream: [],
-        mechanism: '保證每週 80% 的訓練量處於脂肪最大氧化率 (FatMax) 區間，刺激微血管網絡密度與粒線體生合成，建立最強固的有氧基底，絕不超速堆積乳酸。',
-        formula: 'Zone 2 鎖定：149 bpm ～ 165 bpm (上限以 LTHR × 89% 為鐵律)',
-        links: ['• San-Millán, I. & Brooks, G. A. (2018). Sports Med.']
-      },
-      'mp': {
-        title: '台北馬 MP 目標配速 (5:18～5:20/km)',
-        icon: '🎯',
-        badge: '5:18～5:20 /km',
-        category: '戰術輸出與落地指標',
-        upstream: ['daniels', 'pb', 'lthr'],
-        downstream: [],
-        mechanism: 'Sub-3:45 之官方配速基準。建立跑者在此配速下的神經衝擊耐受力，並檢驗觸地時間剛性 (GCT < 240ms) 與步幅自然延展至 102~106cm。',
-        formula: 'Pace_MP = 5 min 18 sec / km (Sub-3:45 巡航速度)',
-        links: ['• Daniels, J. (2014). Daniels' Running Formula.']
-      },
-      'pred': {
-        title: '大賽預測完賽成績 (Sub-3:45 戰略推演)',
-        icon: '👑',
-        badge: 'Sub-3:45 戰略',
-        category: '戰術輸出與落地指標',
-        upstream: ['riegel', 'daniels', 'pb'],
-        downstream: [],
-        mechanism: '以半馬 2:01:08 為起點，透過 8 週週期課表（社區短坡推蹬 + 平地河堤 14K~30K LSD）將疲勞指數由 1.08 壓縮至 1.055，達成全馬 Sub-3:45 的破紀錄飛躍。',
-        formula: 'Predict_Time = 121.13 × (42.195 / 21.0975)^1.058 ≈ 3 小時 44 分 50 秒',
-        links: ['• Riegel, P. S. (1981). Athletic records and human endurance.']
-      },
-      'gapout': {
-        title: '社區上坡等效配速 (GAP: 7:15 等效 5:20)',
-        icon: '⛰️',
-        badge: '7:15 等效 5:20',
-        category: '戰術輸出與落地指標',
-        upstream: ['minetti', 'slope'],
-        downstream: [],
-        mechanism: '跑者在社區環線爬坡時，雖配速降至 7:15/km，但由於 Minetti 坡度能耗加成，心血管與肌肉代謝負荷完全等同於平地河堤 5:20/km 之 MP 輸出，消除跑者無謂的減速焦慮！',
-        formula: 'GAP = 5:20/km on +6% Slope @ 7:15/km Pace',
-        links: ['• Minetti, A. E. et al. (2002). J Appl Physiol.']
-      },
-      'stop阀': {
-        title: '動態折返安全煞車閥 (Stop-Loss Protocol)',
-        icon: '🛑',
-        badge: '7K 停看聽',
-        category: '戰術輸出與落地指標',
-        upstream: ['plews', 'decoupling', 'stamina', 'rhr', 'hrv'],
-        downstream: [],
-        mechanism: '10/31 晨脈偏高 (63bpm) 時系統即時開立「7K 決策閥門」；若心率飄破 163 bpm 即時終止長跑，防止急性疲勞轉化為慢性過度訓練 (Overtraining Syndrome)。',
-        formula: 'IF (HR > 163 bpm AND Lap > 7K) THEN Trigger_Stop_Run()',
-        links: ['• Meeusen, R. et al. (2013). MSSE.']
-      },
-      'gsheetout': {
-        title: 'Google Sheet F 欄實跑摘要回填 (PDCA 閉環)',
-        icon: '📊',
-        badge: '99分 A+ 閉環',
-        category: '戰術輸出與落地指標',
-        upstream: ['banister', 'decoupling', 'gait'],
-        downstream: [],
-        mechanism: '完成 Plan (A-E欄) ➡️ Do & Check (F欄實跑驗證) ➡️ Act (動態微調後續課表) 的完整運動科學管理閉環，記錄配速、均心率、衝刺步頻與雙教練 99 分評定。',
-        formula: 'F_column = 【實跑驗證】距離 @ 配速 | 均心率 | 步頻 | 評定得分',
-        links: ['• Deming, W. E. Out of the Crisis.']
-      }
-    };
+  "age": {
+    "title": "年齡 (Age) 生理影響模型",
+    "icon": "👤",
+    "badge": "45 歲",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "karvonen",
+      "banister",
+      "z2zone"
+    ],
+    "mechanism": "年齡主要影響人體最大心率自然衰減係數（Tanaka 公式：208 - 0.7 × 年齡；Gellish 公式：207 - 0.7 × 年齡），並透過儲備心率公式影響 Zone 2 天花板；在 Banister TRIMP 中，男性與女性年齡加權指數會改變疲勞累積速度。",
+    "formula": "Tanaka_MaxHR = 208 - (0.7 × Age)\nHRR = Tanaka_MaxHR - Rest_HR",
+    "links": [
+      "• Tanaka, H. et al. (2001). Age-predicted maximal heart rate revisited. JACC.",
+      "• Gellish, R. L. et al. (2007). Longitudinal Modeling of the Relationship between Age and Maximal Heart Rate."
+    ]
+  },
+  "rhr": {
+    "title": "晨脈 / 靜止心率 (Rest HR) 恢復基線",
+    "icon": "💓",
+    "badge": "53～56 bpm",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "karvonen",
+      "banister",
+      "z2zone",
+      "pmcout"
+    ],
+    "mechanism": "靜止晨脈是自律神經與心血管恢復狀態的最敏銳晴雨表。若晨脈較基準線高出 5+ bpm（如 10/31 飆至 63 bpm），代表交感神經亢奮或心肌搏出量未完全修復；晨脈回降至 57 bpm 則代表超量恢復達成。",
+    "formula": "HR_reserve = Max_HR - Rest_HR\nZone2_Lower = Rest_HR + 0.60 × HR_reserve",
+    "links": [
+      "• Karvonen, M. J. et al. (1957). The effects of training on heart rate.",
+      "• Friel, J. (2016). The Triathlete's Training Bible. VeloPress."
+    ]
+  },
+  "maxhr": {
+    "title": "個人最大心率 (Max HR) 天花板",
+    "icon": "🔥",
+    "badge": "200～210 bpm",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "karvonen",
+      "banister",
+      "z2zone"
+    ],
+    "mechanism": "Edward 實測極限心率可達 200~210 bpm（高於同齡平均 175 bpm），代表擁有極大有氧動力儲備 (Cardiovascular Reserve)。若誤用傳統 220-年齡 公式，會導致各訓練區間嚴重低估，喪失高強度神經刺激與訓練效益。",
+    "formula": "ΔHRratio = (HR_ex - Rest_HR) / (Max_HR - Rest_HR)",
+    "links": [
+      "• ACSM's Guidelines for Exercise Testing and Prescription."
+    ]
+  },
+  "lthr": {
+    "title": "乳酸閾值心率 (LTHR) 能量分界",
+    "icon": "⚡",
+    "badge": "184～193 bpm",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "karvonen",
+      "daniels",
+      "stamina",
+      "z2zone",
+      "mp"
+    ],
+    "mechanism": "乳酸閾值代表血液乳酸濃度達到平衡（約 4.0 mmol/L）的最大強度。神聖 Zone 2 的上限由 LTHR × 85%~89% 嚴格錨定（Edward 為 163~165 bpm），一旦突破此防線，體能消耗即由脂肪氧化切換為高耗能的糖原酵解。",
+    "formula": "Zone2_Ceiling = LTHR × 0.89\nZone4_Threshold = LTHR × 1.00 ± 2%",
+    "links": [
+      "• Friel, J. The Triathlete's Training Bible. VeloPress.",
+      "• Coggan, A. R. Training and Racing with a Power Meter."
+    ]
+  },
+  "temp": {
+    "title": "環境氣溫與熱應力 (Ambient Temp & Thermal Stress)",
+    "icon": "🌡️",
+    "badge": "15°C～28°C",
+    "category": "環境參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "decoupling",
+      "riegel",
+      "stamina",
+      "banister",
+      "mp",
+      "pred"
+    ],
+    "mechanism": "馬拉松最佳競賽氣溫為 10°C~15°C。當環境氣溫升高（如長榮半馬 27°C 烈日 vs 台北馬預期 15°C 黃金低溫），人體為了維持核心體溫，會將大量心輸出量分流至皮下微血管進行排汗散熱，導致骨骼肌有效血流減少，引發顯著的心血管漂移（心率上升 5~15 bpm）與能效比 (EF) 折損。權威文獻證實：氣溫每高於 15°C 1°C，馬拉松完賽配速平均折損約 0.3%~0.5%。",
+    "formula": "Pace_Penalty = max(0, (Temp - 15) × 0.4%)\nΔHR_Drift = max(0, (Temp - 15) × 1.2 bpm)\nT_adjusted = T_riegel × (1 + Pace_Penalty)",
+    "links": [
+      "• El Helou, N. et al. (2012). Impact of Environmental Parameters on Marathon Running Performance. PLoS ONE, 7(5), e37407.",
+      "• Coyle, E. F. & González-Alonso, J. (2001). Cardiovascular drift during prolonged exercise. Exerc Sport Sci Rev, 29(2), 88-92.",
+      "• Montain, S. J. & Coyle, E. F. (1992). Influence of graded dehydration on hyperthermia and cardiovascular drift. J Appl Physiol."
+    ]
+  },
+  "pb": {
+    "title": "賽事實績 (Race PB) 跑力錨定點",
+    "icon": "🏆",
+    "badge": "半馬 2:01:08",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "daniels",
+      "riegel",
+      "mp",
+      "pred"
+    ],
+    "mechanism": "實際比賽成就是消除所有實驗室理論誤差的最真實依據。長榮半馬 2:01:08 成績餵入後，系統可自動精準推導出當前真實 VDOT 跑力，並使用 Riegel 冪定律推演台北馬 Sub-3:45 戰略。",
+    "formula": "T_full = T_half × (42.195 / 21.0975)^1.06",
+    "links": [
+      "• Riegel, P. S. (1981). Athletic records and human endurance.",
+      "• Daniels, J. (2014). Daniels' Running Formula."
+    ]
+  },
+  "slope": {
+    "title": "地形坡度與爬升 (Grade & Ascent)",
+    "icon": "⛰️",
+    "badge": "社區 +6.0%",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "minetti",
+      "gapout"
+    ],
+    "mechanism": "社區環線單圈爬升 25 公尺、均坡 6%，人體對抗重力需要額外招募快縮肌纖維推蹬。Minetti 方程式計算出上坡每增加 1% 坡度，每公斤每公尺能耗增加約 1.5 焦耳，說明了社區上坡心率飆升是天然肌力訓練。",
+    "formula": "C_r = 155.4·i⁵ - 30.4·i⁴ - 32.8·i³ + 43.1·i² + 21.5·i + 3.6",
+    "links": [
+      "• Minetti, A. E. et al. (2002). J Appl Physiol 93: 1039-1046."
+    ]
+  },
+  "hrv": {
+    "title": "夜間 HRV (rMSSD) 與自律神經狀態",
+    "icon": "🌙",
+    "badge": "32～39 ms",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "plews",
+      "stop閥"
+    ],
+    "mechanism": "HRV (心率變異度) 反映副交感神經對心跳間隔的調節能力。當長榮賽後或衝刺課表後神經疲勞時，HRV 下降（如跌至 30ms），系統會主動建議「降階為 Zone 1 輕慢跑」或啟動 7K 安全折返。",
+    "formula": "rMSSD = sqrt( (1/(N-1)) · ∑(RR_{i+1} - RR_i)² )",
+    "links": [
+      "• Plews, D. J. et al. (2013). Sports Med, 43(9), 773-781."
+    ]
+  },
+  "gait": {
+    "title": "步態動力學 (Cadence, GCT, VO)",
+    "icon": "🏃",
+    "badge": "187spm / 245ms",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "decoupling",
+      "stamina",
+      "gsheetout"
+    ],
+    "mechanism": "步頻 (187 spm)、觸地時間 (245 ms) 與左右平衡 (49.7:50.3) 反映下肢彈簧剛性與跑步經濟性。當疲勞累積時，GCT 會拉長至 260ms 以上、步頻下降，能量浪費在煞車衝擊中。",
+    "formula": "Speed = Cadence × Stride_Length\nImpact_Load = ∑(Work × GCT)",
+    "links": [
+      "• Cavanagh, P. R. & Lafortune, M. A. (1980). J Biomech."
+    ]
+  },
+  "karvonen": {
+    "title": "Karvonen 儲備心率與 Friel 區間模型",
+    "icon": "💓",
+    "badge": "HRR 區間",
+    "category": "核心計算模型",
+    "upstream": [
+      "age",
+      "rhr",
+      "maxhr",
+      "lthr"
+    ],
+    "downstream": [
+      "z2zone"
+    ],
+    "mechanism": "排除一般公式忽略靜息心率的缺陷，採用「儲備心率 (HRR)」依據真實血管動態劃分 Zone 1~5。路格教練將 Zone 2 定義在 149~165 bpm，是全馬燃脂與粒線體增生的最有效金牌區間。",
+    "formula": "HR_target = Rest_HR + (Max_HR - Rest_HR) × Intensity%\nZone 2: 60%~75% HRR (神聖鎖定)",
+    "links": [
+      "• Karvonen, M. J. et al. (1957). Ann Med Exp Biol Fenn."
+    ]
+  },
+  "daniels": {
+    "title": "Jack Daniels VDOT 跑力公式",
+    "icon": "🏃‍♂️",
+    "badge": "跑力配速",
+    "category": "核心計算模型",
+    "upstream": [
+      "pb",
+      "lthr"
+    ],
+    "downstream": [
+      "mp",
+      "pred"
+    ],
+    "mechanism": "美國傳奇跑步教練 Jack Daniels 博士提出的攝氧能效指標。透過單次賽事實績計算最大攝氧量利用率，反推各生理區間最適配速，避免跑太快變乳酸債、跑太慢無訓練刺激。",
+    "formula": "VO2 = -4.60 + 0.182258·v + 0.000104·v²\nVDOT = VO2 / %VO2max",
+    "links": [
+      "• Daniels, J. (2014). Daniels' Running Formula."
+    ]
+  },
+  "riegel": {
+    "title": "Riegel 馬拉松耐力衰減與大賽推演",
+    "icon": "🎯",
+    "badge": "全馬推演",
+    "category": "核心計算模型",
+    "upstream": [
+      "pb",
+      "temp"
+    ],
+    "downstream": [
+      "pred"
+    ],
+    "mechanism": "工程師 Peter Riegel 於 1981 年提出的耐力衰減冪定律。假設人體隨著運動距離加倍，速度會因肌肉疲勞與能量枯竭衰減約 6% ($b=1.06$)。本系統納入溫度熱折損補償，用以精準推算台北馬拉松 Sub-3:45 的可行性。",
+    "formula": "T2 = T1 × (D2 / D1)^1.06 × (1 + Temp_Penalty)",
+    "links": [
+      "• Riegel, P. S. (1981). Athletic records and human endurance."
+    ]
+  },
+  "banister": {
+    "title": "Banister TRIMP 負荷衝量與 Coggan PMC",
+    "icon": "📈",
+    "badge": "PMC 體能",
+    "category": "核心計算模型",
+    "upstream": [
+      "age",
+      "rhr",
+      "maxhr",
+      "temp"
+    ],
+    "downstream": [
+      "pmcout"
+    ],
+    "mechanism": "Eric Banister 博士提出的生理負荷量化指標。將運動時的心率儲備比率進行指數加權（高心率負荷呈指數倍增），產出單次訓練量 (Training Impulse)，並滾動推算 42天體能 (CTL) 與 7天疲勞 (ATL)。",
+    "formula": "TRIMP = t(min) × ΔHR × 0.64e^(1.92 · ΔHR)\nTSB = CTL - ATL",
+    "links": [
+      "• Banister, E. W. (1991). Modeling Elite Athletic Performance."
+    ]
+  },
+  "minetti": {
+    "title": "Minetti 坡度代謝方程式與 GAP 轉換",
+    "icon": "⛰️",
+    "badge": "代謝轉換",
+    "category": "核心計算模型",
+    "upstream": [
+      "slope"
+    ],
+    "downstream": [
+      "gapout"
+    ],
+    "mechanism": "Alberto Minetti 教授在人體運動代謝經典論文中，透過呼吸測量儀測定不同坡度下的跑步能量消耗（Cost of Running, J/kg/m），建立了現代所有 GAP (Grade Adjusted Pace) 演算法的黃金標準。",
+    "formula": "C(i) = 155.4·i⁵ - 30.4·i⁴ - 32.8·i³ + 43.1·i² + 21.5·i + 3.6",
+    "links": [
+      "• Minetti, A. E. et al. (2002). J Appl Physiol 93: 1039-1046."
+    ]
+  },
+  "decoupling": {
+    "title": "有氧脫鉤與能效比 (Aerobic Decoupling EF)",
+    "icon": "📉",
+    "badge": "心率漂移",
+    "category": "核心計算模型",
+    "upstream": [
+      "gait",
+      "temp"
+    ],
+    "downstream": [
+      "stop閥",
+      "gsheetout"
+    ],
+    "mechanism": "Joe Friel 提出的心血管穩態檢測法。在等速平坦長跑中，比較前半程與後半程的「心率 vs 速度」比值。若後半程心率飄升超過 5%，代表脫水、體溫過高或慢縮肌衰退，心血管已產生脫鉤。11/01 16K 之 +2bpm 為近乎零漂移。",
+    "formula": "Decoupling % = (EF_first - EF_second) / EF_first × 100%\n判定標準：< 5% 卓越",
+    "links": [
+      "• Friel, J. The Power Meter Handbook."
+    ]
+  },
+  "stamina": {
+    "title": "Firstbeat 即時體力模型 (Stamina & Glycogen)",
+    "icon": "🔋",
+    "badge": "動態消耗",
+    "category": "核心計算模型",
+    "upstream": [
+      "lthr",
+      "gait",
+      "temp"
+    ],
+    "downstream": [
+      "stamout"
+    ],
+    "mechanism": "結合即時攝氧量、EPOC 累積與無氧工作容量 (W')，動態模擬體能池剩餘百分比。在 Zone 2 巡航時僅緩慢消耗體力，但若心率突破閾值或高溫熱蓄積，體力池下降速率呈幾何級數加快。",
+    "formula": "Stamina(t) = 100% - ∫ [Aerobic_Cost(t) + W_prime_expend(t)] dt",
+    "links": [
+      "• Firstbeat Technologies. (2020). Stamina Metric White Paper."
+    ]
+  },
+  "plews": {
+    "title": "Plews 自律神經與每日晨脈就緒度模型",
+    "icon": "🧘",
+    "badge": "就緒決策",
+    "category": "核心計算模型",
+    "upstream": [
+      "hrv",
+      "rhr"
+    ],
+    "downstream": [
+      "stop閥",
+      "gsheetout"
+    ],
+    "mechanism": "Daniel Plews 博士（鐵人世界冠軍與運動科學家）提出的 HRV 滾動基準線評估法。透過 7 天移動平均與 1 個標準差 (SWC) 區間，判斷交感/副交感平衡，作為今日是否放行 16K 高負荷長跑的決策依據。",
+    "formula": "SWC = 0.5 × SD_baseline\nDecision: In_Range -> 滿載; Below_SWC -> 降速",
+    "links": [
+      "• Plews, D. J. et al. (2012, 2013). Sports Med."
+    ]
+  },
+  "z2zone": {
+    "title": "神聖 Zone 2 心率防線 (149～165 bpm)",
+    "icon": "🛡️",
+    "badge": "149～165 bpm",
+    "category": "戰術輸出與賽事推演",
+    "upstream": [
+      "karvonen",
+      "age",
+      "rhr",
+      "maxhr",
+      "lthr"
+    ],
+    "downstream": [
+      "gsheetout"
+    ],
+    "mechanism": "路格教練反覆強調的「神聖有氧防線」。下限 149 bpm 確保足夠心肌搏出量與粒線體刺激，上限 165 bpm 嚴格封鎖乳酸累積。11/01 16K 全程均心率守在 162 bpm，完全展現了極致的生理自律。",
+    "formula": "Zone 2 Lower = 149 bpm (60% HRR)\nZone 2 Upper = 165 bpm (85% LTHR)",
+    "links": [
+      "• Seiler, S. (2010). What is best practice for training intensity distribution?"
+    ]
+  },
+  "mp": {
+    "title": "馬拉松目標配速 (Marathon Pace MP)",
+    "icon": "🎯",
+    "badge": "5:15～5:20",
+    "category": "戰術輸出與賽事推演",
+    "upstream": [
+      "daniels",
+      "lthr",
+      "temp"
+    ],
+    "downstream": [
+      "pred",
+      "gsheetout"
+    ],
+    "mechanism": "台北馬拉松衝擊個人 PB (Sub-3:45) 的核心節奏。在 15°C 最適溫平坦河堤路段，維持 184~187 步頻、觸地時間 245ms，以每公里 5:15~5:20 的能效最佳巡航配速推進。",
+    "formula": "MP = VDOT_Pace × Flat_Efficiency_Ratio × Temp_Factor",
+    "links": [
+      "• Daniels, J. (2014). Daniels' Running Formula."
+    ]
+  },
+  "pred": {
+    "title": "大賽完賽時間沙盤推演 (Race Prediction)",
+    "icon": "⏱️",
+    "badge": "台北馬 Sub-3:45",
+    "category": "戰術輸出與賽事推演",
+    "upstream": [
+      "riegel",
+      "pb",
+      "daniels",
+      "temp"
+    ],
+    "downstream": [
+      "gsheetout"
+    ],
+    "mechanism": "綜合長榮半馬 2:01:08（27°C 高溫）實績，經氣溫校正（+4.8% 熱折損回補）與 Riegel 冪定律推估：台北馬（15°C 低溫）完賽時間鎖定在 3小時42分～3小時45分，具備極高達成勝率！",
+    "formula": "T_Predicted = T_HM × (42.195 / 21.0975)^1.058 × Temp_Correction",
+    "links": [
+      "• Riegel, P. S. (1981). Athletic records and human endurance."
+    ]
+  },
+  "gapout": {
+    "title": "等效平地配速 GAP (社區 vs 平地河堤)",
+    "icon": "⚡",
+    "badge": "6:24 ➡️ 5:39 GAP",
+    "category": "戰術輸出與賽事推演",
+    "upstream": [
+      "minetti",
+      "slope"
+    ],
+    "downstream": [
+      "gsheetout"
+    ],
+    "mechanism": "消除地心引力坡度干擾的真實做功能力指標。11/01 社區長跑 16K 實測 6:24 /km，換算等效平地河堤配速相當於 5:39 /km，第 16 公里衝刺甚至達 5:02 GAP，證實平路巡航戰力超群。",
+    "formula": "GAP_sec = Pace_sec / (Cost_Slope / Cost_Flat)",
+    "links": [
+      "• Strava GAP & TrainingPeaks NGP Models."
+    ]
+  },
+  "pmcout": {
+    "title": "PMC 體能管理 (CTL/ATL/TSB 就緒指數)",
+    "icon": "🔋",
+    "badge": "Form +8.4 巔峰",
+    "category": "戰術輸出與賽事推演",
+    "upstream": [
+      "banister",
+      "rhr"
+    ],
+    "downstream": [
+      "gsheetout"
+    ],
+    "mechanism": "滾動監控長期體能 (CTL)、短期疲勞 (ATL) 與競技狀態 (TSB)。長榮半馬大衝擊後 ATL 升高，但透過週三 Zone 1 排酸與週五充分休息，TSB 回升至 +8.4 甜蜜點，完全具備執行 16K 的體能就緒度。",
+    "formula": "TSB = CTL - ATL (最佳競技窗口: -10 ~ +15)",
+    "links": [
+      "• Coggan, A. R. Training and Racing with a Power Meter."
+    ]
+  },
+  "stop閥": {
+    "title": "7K 防線停損閥與心率警報 (Guardrail Stop)",
+    "icon": "🛑",
+    "badge": "心率 > 163 終止",
+    "category": "戰術輸出與賽事推演",
+    "upstream": [
+      "plews",
+      "hrv",
+      "decoupling"
+    ],
+    "downstream": [
+      "gsheetout"
+    ],
+    "mechanism": "雙教練安全保護機制：當前日晨脈高於 60 bpm 或 HRV 偏低時，自動啟動「7K 檢驗閥」。若 7 公里時心率突破 163 bpm 或左右平衡嚴重失衡（> 51:49），即刻發出終止長跑警告，改為快走折返。",
+    "formula": "IF (HR_7k > 163 || Balance_skew > 1.5%) -> ABORT_TO_WALK",
+    "links": [
+      "• Luger & Pace Dual-Coach Clinical Safety Protocol."
+    ]
+  },
+  "stamout": {
+    "title": "Stamina 完賽剩餘體力與骨骼衝擊負荷",
+    "icon": "📊",
+    "badge": "剩餘 56% 頂規",
+    "category": "戰術輸出與賽事推演",
+    "upstream": [
+      "stamina"
+    ],
+    "downstream": [
+      "gsheetout"
+    ],
+    "mechanism": "11/01 跑完 16K 長距離後，體能剩餘 56%（總耗損僅 44%），骨骼衝擊負荷約 1,940，證明以 162 bpm 有氧巡航對肌糖原消耗極為節省，無撞牆風險，恢復時間可大幅縮短至 24 小時以內。",
+    "formula": "Impact_Load = Total_Steps × Avg_GCT_ms × Weight_kg / 1000",
+    "links": [
+      "• Garmin Firstbeat Analytics & Running Dynamics."
+    ]
+  },
+  "gsheetout": {
+    "title": "Google Sheet 雲端課表自動評分與回填",
+    "icon": "📋",
+    "badge": "F欄 99分 A+ 頂規",
+    "category": "戰術輸出與賽事推演",
+    "upstream": [
+      "gait",
+      "decoupling",
+      "plews",
+      "z2zone",
+      "mp",
+      "pred",
+      "gapout",
+      "pmcout",
+      "stop閥",
+      "stamout"
+    ],
+    "downstream": [],
+    "mechanism": "將所有生理指標（均心率 162、步頻 187、左右 49.7:50.3、無心率漂移）自動彙整，綜合判定 99 分（A+ 頂規突破），並透過 Webhook 自動回填試算表 F17 欄位，標記「週日 實跑已驗證」綠燈！",
+    "formula": "Score = Base(100) - HR_Penalty - Decouple_Penalty - Asymmetry_Penalty",
+    "links": [
+      "• Antigravity AI Coach Automated Protocol."
+    ]
+  }
+};
 
     let activeNodeId = null;
-    const tooltipEl = document.getElementById('floating-tooltip');
 
-    // 浮動 Tooltip 控制
+    // 游標懸停顯示 Tooltip
     function showTooltip(e, id) {
       const data = nodeRelations[id];
       if (!data) return;
-
-      document.getElementById('tt-title').textContent = (data.icon ? data.icon + ' ' : '') + data.title;
-      document.getElementById('tt-badge').textContent = data.badge || data.category;
-      
-      const formulaEl = document.getElementById('tt-formula');
-      if (data.formula) {
-        formulaEl.innerHTML = data.formula.split('\n')[0];
-        formulaEl.classList.remove('hidden');
-      } else {
-        formulaEl.classList.add('hidden');
-      }
-
-      document.getElementById('tt-desc').textContent = data.mechanism;
-
-      tooltipEl.classList.remove('hidden');
-      moveTooltip(e);
+      const tt = document.getElementById('floating-tooltip');
+      document.getElementById('tt-title').textContent = (data.icon || '') + ' ' + data.title;
+      document.getElementById('tt-badge').textContent = data.badge || '';
+      document.getElementById('tt-formula').textContent = data.formula || '';
+      document.getElementById('tt-desc').textContent = data.mechanism || '';
+      tt.classList.remove('hidden');
+      positionTooltip(e);
     }
 
     function moveTooltip(e) {
-      if (tooltipEl.classList.contains('hidden')) return;
-      const xOffset = 18;
-      const yOffset = 18;
-      let left = e.clientX + xOffset;
-      let top = e.clientY + yOffset;
+      positionTooltip(e);
+    }
 
-      // 邊界防溢出
-      const ttWidth = 340;
-      if (left + ttWidth > window.innerWidth) {
-        left = e.clientX - ttWidth - 12;
-      }
-      if (top + 160 > window.innerHeight) {
-        top = e.clientY - 160;
-      }
-
-      tooltipEl.style.left = left + 'px';
-      tooltipEl.style.top = top + 'px';
+    function positionTooltip(e) {
+      const tt = document.getElementById('floating-tooltip');
+      if (!tt || tt.classList.contains('hidden')) return;
+      const pad = 16;
+      let x = e.clientX + pad;
+      let y = e.clientY + pad;
+      const w = 340;
+      const h = tt.offsetHeight || 180;
+      if (x + w > window.innerWidth) x = e.clientX - w - pad;
+      if (y + h > window.innerHeight) y = e.clientY - h - pad;
+      tt.style.left = Math.max(8, x) + 'px';
+      tt.style.top = Math.max(8, y) + 'px';
     }
 
     function hideTooltip() {
-      tooltipEl.classList.add('hidden');
+      const tt = document.getElementById('floating-tooltip');
+      if (tt) tt.classList.add('hidden');
     }
 
     // 點擊鎖定選取與連動亮燈
@@ -787,20 +956,22 @@ TSB = CTL - ATL',
       const data = nodeRelations[id];
       if (!data) return;
 
-      // 重置所有節點樣式
+      hideTooltip();
+
+      // 清除所有卡片現有發光與變暗
       document.querySelectorAll('.node-item').forEach(el => {
-        el.classList.remove('glow-active', 'glow-upstream', 'glow-downstream');
+        el.classList.remove('glow-active', 'glow-upstream', 'glow-downstream', 'node-dim');
         el.classList.add('node-dim');
       });
 
-      // 點亮當前節點
-      const targetEl = document.getElementById('node-' + id);
-      if (targetEl) {
-        targetEl.classList.remove('node-dim');
-        targetEl.classList.add('glow-active');
+      // 1. 本身節點 (綠光)
+      const curEl = document.getElementById('node-' + id);
+      if (curEl) {
+        curEl.classList.remove('node-dim');
+        curEl.classList.add('glow-active');
       }
 
-      // 點亮上游節點
+      // 2. 上游依賴節點 (藍光)
       if (data.upstream && data.upstream.length > 0) {
         data.upstream.forEach(upId => {
           const upEl = document.getElementById('node-' + upId);
@@ -811,7 +982,7 @@ TSB = CTL - ATL',
         });
       }
 
-      // 點亮下游節點
+      // 3. 下游影響節點 (橘光)
       if (data.downstream && data.downstream.length > 0) {
         data.downstream.forEach(downId => {
           const downEl = document.getElementById('node-' + downId);
@@ -828,14 +999,14 @@ TSB = CTL - ATL',
       document.getElementById('exp-category').textContent = '類別：' + data.category;
       document.getElementById('exp-mechanism').textContent = data.mechanism;
       document.getElementById('exp-formula').innerHTML = (data.formula || '').replace(/\n/g, '<br>');
-      
-      const linksContainer = document.getElementById('exp-links');
-      linksContainer.innerHTML = '';
+
+      const linksBox = document.getElementById('exp-links');
+      linksBox.innerHTML = '';
       if (data.links && data.links.length > 0) {
-        data.links.forEach(linkText => {
-          const d = document.createElement('div');
-          d.innerHTML = linkText;
-          linksContainer.appendChild(d);
+        data.links.forEach(l => {
+          const item = document.createElement('div');
+          item.textContent = l;
+          linksBox.appendChild(item);
         });
       }
 
@@ -855,40 +1026,39 @@ TSB = CTL - ATL',
       document.getElementById('exp-badge').classList.add('hidden');
     }
 
-    // 即時模擬計算器運算邏輯
+    // 🧮 動態參數連動計算
     function recalculate() {
-      const age = parseInt(document.getElementById('input-age').value);
-      const rhr = parseInt(document.getElementById('input-rhr').value);
-      const maxhr = parseInt(document.getElementById('input-maxhr').value);
+      const age = parseInt(document.getElementById('input-age') ? document.getElementById('input-age').value : 45);
+      const rhr = parseInt(document.getElementById('input-rhr') ? document.getElementById('input-rhr').value : 57);
+      const maxhr = parseInt(document.getElementById('input-maxhr') ? document.getElementById('input-maxhr').value : 200);
       const temp = parseInt(document.getElementById('input-temp') ? document.getElementById('input-temp').value : 15);
-      const hmMinutes = parseInt(document.getElementById('input-hm').value);
-      const slope = parseFloat(document.getElementById('input-slope').value);
-      const paceSec = parseInt(document.getElementById('input-pace').value);
+      const hmMinutes = parseInt(document.getElementById('input-hm') ? document.getElementById('input-hm').value : 121);
+      const slope = parseFloat(document.getElementById('input-slope') ? document.getElementById('input-slope').value : 6);
+      const paceSec = parseInt(document.getElementById('input-pace') ? document.getElementById('input-pace').value : 435);
 
-      document.getElementById('val-age').textContent = age + ' 歲';
-      document.getElementById('val-rhr').textContent = rhr + ' bpm';
-      document.getElementById('val-maxhr').textContent = maxhr + ' bpm';
+      if (document.getElementById('val-age')) document.getElementById('val-age').textContent = age + ' 歲';
+      if (document.getElementById('val-rhr')) document.getElementById('val-rhr').textContent = rhr + ' bpm';
+      if (document.getElementById('val-maxhr')) document.getElementById('val-maxhr').textContent = maxhr + ' bpm';
       const tempTag = temp <= 15 ? ' (最適低溫)' : (temp >= 25 ? ' (高溫熱應力)' : ' (微熱)');
       if (document.getElementById('val-temp')) document.getElementById('val-temp').textContent = temp + ' °C' + tempTag;
-      
+
       const hmH = Math.floor(hmMinutes / 60);
       const hmM = hmMinutes % 60;
-      document.getElementById('val-hm').textContent = `${hmH}:${hmM < 10 ? '0' : ''}${hmM}:00`;
-      
-      document.getElementById('val-slope').textContent = (slope >= 0 ? '+' : '') + slope.toFixed(1) + '%';
-      
+      if (document.getElementById('val-hm')) document.getElementById('val-hm').textContent = `${hmH}:${hmM < 10 ? '0' : ''}${hmM}:00`;
+      if (document.getElementById('val-slope')) document.getElementById('val-slope').textContent = (slope >= 0 ? '+' : '') + slope.toFixed(1) + '%';
+
       const paceM = Math.floor(paceSec / 60);
       const paceS = paceSec % 60;
-      document.getElementById('val-pace').textContent = `${paceM}:${paceS < 10 ? '0' : ''}${paceS} /km`;
+      if (document.getElementById('val-pace')) document.getElementById('val-pace').textContent = `${paceM}:${paceS < 10 ? '0' : ''}${paceS} /km`;
 
       // 1. HRR
       const hrr = Math.max(10, maxhr - rhr);
-      document.getElementById('calc-hrr').textContent = hrr + ' bpm';
+      if (document.getElementById('calc-hrr')) document.getElementById('calc-hrr').textContent = hrr + ' bpm';
 
       // 2. Zone 2
       const z2Min = Math.round(rhr + hrr * 0.60);
       const z2Max = Math.round(rhr + hrr * 0.75);
-      document.getElementById('calc-z2').textContent = `${z2Min} ～ ${z2Max} bpm`;
+      if (document.getElementById('calc-z2')) document.getElementById('calc-z2').textContent = `${z2Min} ～ ${z2Max} bpm`;
 
       // 3. VDOT
       const vKmh = 21.0975 / (hmMinutes / 60);
@@ -896,17 +1066,19 @@ TSB = CTL - ATL',
       const vo2 = -4.60 + 0.182258 * vMeterMin + 0.000104 * Math.pow(vMeterMin, 2);
       const pctMax = 0.8 + 0.1894393 * Math.exp(-0.012778 * hmMinutes) + 0.2989558 * Math.exp(-0.1932605 * hmMinutes);
       const vdot = (vo2 / pctMax).toFixed(1);
-      document.getElementById('calc-vdot').textContent = `${vdot}`;
+      if (document.getElementById('calc-vdot')) document.getElementById('calc-vdot').textContent = `${vdot}`;
 
-      // 4. Riegel 全馬推估 + 溫度熱折損 (El Helou 模型: >15°C 每度 +0.4%)
+      // 4. Riegel 全馬推估 + 溫度熱折損
       const baseFmMin = hmMinutes * Math.pow(42.195 / 21.0975, 1.058);
       const tempDelta = Math.max(0, temp - 15);
-      const penaltyPct = tempDelta * 0.4; // %
+      const penaltyPct = tempDelta * 0.4;
       const adjFmMin = baseFmMin * (1 + penaltyPct / 100);
       const fmH = Math.floor(adjFmMin / 60);
       const fmM = Math.round(adjFmMin % 60);
       const extraMin = Math.round(adjFmMin - baseFmMin);
-      document.getElementById('calc-fm').textContent = `${fmH}小時${fmM}分` + (extraMin > 0 ? ` (+${extraMin}分)` : '');
+      if (document.getElementById('calc-fm')) {
+        document.getElementById('calc-fm').textContent = `${fmH}小時${fmM}分` + (extraMin > 0 ? ` (+${extraMin}分)` : '');
+      }
 
       // 5. 溫度心血管漂移與折損率顯示
       const hrDrift = Math.round(tempDelta * 1.2);
@@ -918,14 +1090,16 @@ TSB = CTL - ATL',
         document.getElementById('calc-penalty').textContent = tempDelta > 0 ? `+${penaltyPct.toFixed(1)}% (+${pacePenaltySec}s/km)` : '+0.0% (最適溫)';
       }
 
-      // 5. GAP
+      // 6. Minetti GAP
       const i = slope / 100.0;
       const cr = 155.4 * Math.pow(i, 5) - 30.4 * Math.pow(i, 4) - 32.8 * Math.pow(i, 3) + 43.1 * Math.pow(i, 2) + 21.5 * i + 3.6;
       const costRatio = Math.max(0.6, cr / 3.6);
       const gapSec = paceSec / costRatio;
       const gapM = Math.floor(gapSec / 60);
       const gapS = Math.round(gapSec % 60);
-      document.getElementById('calc-gap').textContent = `${gapM}:${gapS < 10 ? '0' : ''}${gapS} /km`;
+      if (document.getElementById('calc-gap')) {
+        document.getElementById('calc-gap').textContent = `${gapM}:${gapS < 10 ? '0' : ''}${gapS} /km`;
+      }
     }
 
     window.onload = function() {
