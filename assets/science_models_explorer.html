@@ -78,9 +78,17 @@
         <h2 class="text-xs font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
           <span>🎛️</span> 跑者生理基線 (Inputs)
         </h2>
-        <span class="text-[11px] text-slate-500">9 項數據（生理 + 環境）</span>
+        <span class="text-[11px] text-slate-500">10 項數據（生理 + 環境）</span>
       </div>
 
+
+      <div id="node-sex" onclick="selectNode('sex')" onmouseenter="showTooltip(event, 'sex')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <span class="text-sm">⚧️</span>
+          <span class="font-bold text-xs text-sky-200">生理性別 (Sex / Gender)</span>
+        </div>
+        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">男 (Edward) / 女</span>
+      </div>
       <div id="node-age" onclick="selectNode('age')" onmouseenter="showTooltip(event, 'age')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
         <div class="flex items-center gap-2">
           <span class="text-sm">👤</span>
@@ -333,6 +341,17 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
       <!-- Sliders 1 -->
       <div class="space-y-2">
+
+        <div>
+          <div class="flex justify-between text-slate-300 mb-0.5">
+            <span>生理性別 (Biological Sex)：</span>
+            <span id="val-sex" class="text-sky-400 font-mono">男性 (Male)</span>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" id="btn-sex-m" onclick="setSex('m')" class="flex-1 py-1 rounded bg-sky-600 text-white font-bold text-xs border border-sky-400 transition-colors">男性 ♂</button>
+            <button type="button" id="btn-sex-f" onclick="setSex('f')" class="flex-1 py-1 rounded bg-slate-800 text-slate-300 text-xs border border-slate-700 hover:bg-slate-700 transition-colors">女性 ♀</button>
+          </div>
+        </div>
         <div>
           <div class="flex justify-between text-slate-300 mb-0.5">
             <span>年齡 (Age)：</span>
@@ -418,6 +437,11 @@
           <span id="calc-fm" class="font-bold text-amber-400 font-mono">4小時12分</span>
         </div>
 
+
+        <div class="flex justify-between">
+          <span class="text-slate-400">Banister TRIMP 權重：</span>
+          <span id="calc-trimp-coeff" class="font-bold text-purple-400 font-mono">b=1.92 (男專屬)</span>
+        </div>
         <div class="flex justify-between">
           <span class="text-slate-400">心血管漂移預估：</span>
           <span id="calc-drift" class="font-bold text-sky-400 font-mono">0 bpm (無漂移)</span>
@@ -674,6 +698,7 @@
     "badge": "HRR 區間",
     "category": "核心計算模型",
     "upstream": [
+      "sex",
       "age",
       "rhr",
       "maxhr",
@@ -748,6 +773,7 @@
     "badge": "PMC 體能",
     "category": "核心計算模型",
     "upstream": [
+      "sex",
       "age",
       "rhr",
       "maxhr",
@@ -825,6 +851,7 @@
     "badge": "動態消耗",
     "category": "核心計算模型",
     "upstream": [
+      "sex",
       "lthr",
       "gait",
       "temp"
@@ -1083,10 +1110,57 @@
         "url": "https://github.com/rledward1-code/ai-coach"
       }
     ]
+  },
+  "sex": {
+    "title": "生理性別 (Biological Sex) 代謝與負荷權重",
+    "icon": "⚧️",
+    "badge": "男 (Edward) / 女",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "banister",
+      "stamina",
+      "karvonen"
+    ],
+    "mechanism": "性別在運動生理學中具有多維度深遠影響：① Banister TRIMP 負荷公式中，男女採用完全不同的指數權重（男 b=1.92 vs 女 b=1.67）；② 代謝基質方面，女性雌激素促進脂肪氧化，同等相對強度下燃脂比例較男性高 10%~15%，更省肝醣，後半馬撞牆率統計上更低；③ 最大心率年齡衰減方面，女性適用專屬 Gulati 公式 (206 - 0.88×Age)；④ 男性血紅素較高（14~16 vs 12~14 g/dL），動脈血氧含量 (CaO2) 高出約 10%~12%。",
+    "formula": "TRIMP_Male = D · ΔHR · 0.64e^(1.92 · ΔHR)\nTRIMP_Female = D · ΔHR · 0.86e^(1.67 · ΔHR)\nMaxHR_Gulati(女) = 206 - (0.88 × Age)",
+    "links": [
+      {
+        "text": "Banister, E. W. (1991). Modeling Elite Athletic Performance (Sex-specific impulse coefficients).",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/2034080/"
+      },
+      {
+        "text": "Gulati, M. et al. (2010). Heart rate response to exercise stress testing in asymptomatic women. Circulation, 122(2), 130-137.",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/20585012/"
+      },
+      {
+        "text": "Tarnopolsky, M. A. (2008). Sex differences in exercise metabolism and the role of 17-beta estradiol. MSSE, 40(4), 648-654.",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/18317381/"
+      }
+    ]
   }
 };
 
     let activeNodeId = null;
+
+    let currentSex = 'm';
+    function setSex(s) {
+      currentSex = s;
+      const btnM = document.getElementById('btn-sex-m');
+      const btnF = document.getElementById('btn-sex-f');
+      const valSex = document.getElementById('val-sex');
+      if (s === 'm') {
+        if (btnM) { btnM.className = 'flex-1 py-1 rounded bg-sky-600 text-white font-bold text-xs border border-sky-400 transition-colors'; }
+        if (btnF) { btnF.className = 'flex-1 py-1 rounded bg-slate-800 text-slate-300 text-xs border border-slate-700 hover:bg-slate-700 transition-colors'; }
+        if (valSex) { valSex.textContent = '男性 ♂ (Edward)'; valSex.className = 'text-sky-400 font-mono'; }
+      } else {
+        if (btnM) { btnM.className = 'flex-1 py-1 rounded bg-slate-800 text-slate-300 text-xs border border-slate-700 hover:bg-slate-700 transition-colors'; }
+        if (btnF) { btnF.className = 'flex-1 py-1 rounded bg-pink-600 text-white font-bold text-xs border border-pink-400 transition-colors'; }
+        if (valSex) { valSex.textContent = '女性 ♀'; valSex.className = 'text-pink-400 font-mono'; }
+      }
+      recalculate();
+    }
+
 
     // 游標懸停顯示 Tooltip
     function showTooltip(e, id) {
@@ -1234,7 +1308,12 @@
 
     // 🧮 動態參數連動計算
     function recalculate() {
+      const isFemale = currentSex === 'f';
       const age = parseInt(document.getElementById('input-age') ? document.getElementById('input-age').value : 45);
+      if (document.getElementById('calc-trimp-coeff')) {
+        document.getElementById('calc-trimp-coeff').textContent = isFemale ? 'b=1.67 (女, 0.86e^1.67x)' : 'b=1.92 (男, 0.64e^1.92x)';
+        document.getElementById('calc-trimp-coeff').className = isFemale ? 'font-bold text-pink-400 font-mono' : 'font-bold text-sky-400 font-mono';
+      }
       const rhr = parseInt(document.getElementById('input-rhr') ? document.getElementById('input-rhr').value : 57);
       const maxhr = parseInt(document.getElementById('input-maxhr') ? document.getElementById('input-maxhr').value : 200);
       const temp = parseInt(document.getElementById('input-temp') ? document.getElementById('input-temp').value : 15);
