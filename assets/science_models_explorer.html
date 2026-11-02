@@ -78,7 +78,7 @@
         <h2 class="text-xs font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
           <span>🎛️</span> 跑者生理基線 (Inputs)
         </h2>
-        <span class="text-[11px] text-slate-500">10 項數據（生理 + 環境）</span>
+        <span class="text-[11px] text-slate-500">11 項生理與環境基線</span>
       </div>
 
 
@@ -121,7 +121,14 @@
         <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">184～193 bpm</span>
       </div>
 
-      <div id="node-pb" onclick="selectNode('pb')" onmouseenter="showTooltip(event, 'pb')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
+            <div id="node-vo2max" onclick="selectNode('vo2max')" onmouseenter="showTooltip(event, 'vo2max')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <span class="text-sm">🫁</span>
+          <span class="font-bold text-xs text-sky-200">最大攝氧量 (VO₂max)</span>
+        </div>
+        <span class="text-[11px] bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded border border-sky-800/40 font-mono">48～54 ml/kg</span>
+      </div>
+<div id="node-pb" onclick="selectNode('pb')" onmouseenter="showTooltip(event, 'pb')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-sky-500 transition-all-custom flex justify-between items-center">
         <div class="flex items-center gap-2">
           <span class="text-sm">🏆</span>
           <span class="font-bold text-xs text-sky-200">近期實績 (Race PB)</span>
@@ -234,7 +241,7 @@
           <span class="text-sm">🎯</span>
           <span class="font-bold text-xs text-amber-200">全馬 MP 目標配速</span>
         </div>
-        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">5:18～5:20 /km</span>
+        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">5:20～5:25 /km</span>
       </div>
 
       <div id="node-pred" onclick="selectNode('pred')" onmouseenter="showTooltip(event, 'pred')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-amber-500 transition-all-custom flex justify-between items-center">
@@ -242,23 +249,31 @@
           <span class="text-sm">👑</span>
           <span class="font-bold text-xs text-amber-200">大賽預測完賽成績</span>
         </div>
-        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">Sub-3:45 戰略</span>
+        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">Sub-3:50 戰略</span>
+      </div>
+
+      <div id="node-pmcout" onclick="selectNode('pmcout')" onmouseenter="showTooltip(event, 'pmcout')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-amber-500 transition-all-custom flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <span class="text-sm">🔋</span>
+          <span class="font-bold text-xs text-amber-200">PMC 體能就緒 (Form / TSB)</span>
+        </div>
+        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">Form +5.0 充沛</span>
+      </div>
+
+      <div id="node-stamout" onclick="selectNode('stamout')" onmouseenter="showTooltip(event, 'stamout')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-amber-500 transition-all-custom flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <span class="text-sm">⚡</span>
+          <span class="font-bold text-xs text-amber-200">Stamina 完賽體力儲備</span>
+        </div>
+        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">剩餘 55% 充沛</span>
       </div>
 
       <div id="node-gapout" onclick="selectNode('gapout')" onmouseenter="showTooltip(event, 'gapout')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-amber-500 transition-all-custom flex justify-between items-center">
         <div class="flex items-center gap-2">
           <span class="text-sm">⛰️</span>
-          <span class="font-bold text-xs text-amber-200">社區上坡等效配速 (GAP)</span>
+          <span class="font-bold text-xs text-amber-200">坡度等效平地配速 (GAP)</span>
         </div>
-        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">7:15 等效 5:20</span>
-      </div>
-
-      <div id="node-stop阀" onclick="selectNode('stop阀')" onmouseenter="showTooltip(event, 'stop阀')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-amber-500 transition-all-custom flex justify-between items-center">
-        <div class="flex items-center gap-2">
-          <span class="text-sm">🛑</span>
-          <span class="font-bold text-xs text-amber-200">動態折返安全煞車閥</span>
-        </div>
-        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">7K 停看聽</span>
+        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">6:15 ➡️ 5:35 GAP</span>
       </div>
 
       <div id="node-gsheetout" onclick="selectNode('gsheetout')" onmouseenter="showTooltip(event, 'gsheetout')" onmouseleave="hideTooltip()" onmousemove="moveTooltip(event)" class="node-item bg-slate-900 border border-slate-800/90 rounded-lg px-3 py-2 cursor-pointer hover:border-amber-500 transition-all-custom flex justify-between items-center">
@@ -266,7 +281,7 @@
           <span class="text-sm">📊</span>
           <span class="font-bold text-xs text-amber-200">Google Sheet F 欄回填</span>
         </div>
-        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">99分 A+ 閉環</span>
+        <span class="text-[11px] bg-amber-950/80 text-amber-400 px-2 py-0.5 rounded border border-amber-800/40 font-mono">98分 A+ 閉環</span>
       </div>
     </div>
   </div>
@@ -652,8 +667,7 @@
     "category": "輸入參數 ➡️ 影響模型",
     "upstream": [],
     "downstream": [
-      "plews",
-      "stop閥"
+      "plews"
     ],
     "mechanism": "HRV (心率變異度) 反映副交感神經對心跳間隔的調節能力。當全開賽事或高強度衝刺課表後神經疲勞時，HRV 下降（例如跌至 30ms 以下），系統會主動建議「降階為 Zone 1 輕慢跑」或啟動提早折返修復。",
     "formula": "rMSSD = sqrt( (1/(N-1)) · ∑(RR_{i+1} - RR_i)² )",
@@ -722,6 +736,7 @@
     "badge": "跑力配速",
     "category": "核心計算模型",
     "upstream": [
+      "vo2max",
       "pb",
       "lthr"
     ],
@@ -780,7 +795,10 @@
       "temp"
     ],
     "downstream": [
-      "pmcout"
+      "pmcout",
+      "pred",
+      "mp",
+      "stamout"
     ],
     "mechanism": "Eric Banister 博士提出的生理負荷量化指標。將運動時的心率儲備比率進行指數加權（高心率負荷呈指數倍增），產出單次訓練量 (Training Impulse)，並滾動推算 42天體能 (CTL) 與 7天疲勞 (ATL)。",
     "formula": "TRIMP = t(min) × ΔHR × 0.64e^(1.92 · ΔHR)\nTSB = CTL - ATL",
@@ -829,7 +847,6 @@
       "temp"
     ],
     "downstream": [
-      "stop閥",
       "gsheetout"
     ],
     "mechanism": "Joe Friel 提出的心血管穩態檢測法。在等速平坦長跑中，比較前半程與後半程的「心率 vs 速度」比值。若後半程心率飄升超過 5%，代表脫水、體溫過高或慢縮肌衰退，心血管已產生脫鉤；高水準長跑後半程飄升 < 2 bpm 即為近乎零漂移。",
@@ -882,8 +899,8 @@
       "rhr"
     ],
     "downstream": [
-      "stop閥",
-      "gsheetout"
+      "gsheetout",
+      "pmcout"
     ],
     "mechanism": "Daniel Plews 博士（鐵人世界冠軍與運動科學家）提出的 HRV 滾動基準線評估法。透過 7 天移動平均與 1 個標準差 (SWC) 區間，判斷交感/副交感平衡，作為今日是否放行 16K 高負荷長跑的決策依據。",
     "formula": "SWC = 0.5 × SD_baseline\nDecision: In_Range -> 滿載; Below_SWC -> 降速",
@@ -934,13 +951,14 @@
     "upstream": [
       "daniels",
       "lthr",
-      "temp"
+      "temp",
+      "banister"
     ],
     "downstream": [
       "pred",
       "gsheetout"
     ],
-    "mechanism": "目標大賽衝擊個人 PB 的核心巡航節奏。在 15°C 最適溫平坦路段，維持 182~186 步頻、觸地時間約 240ms，以每公里 5:20~5:25 的最佳能效巡航配速推進。",
+    "mechanism": "目標大賽衝擊個人 PB 的核心巡航節奏。依據 VDOT 跑力容量，並依據賽前 PMC 體能儲備 (CTL) 與疲勞消退狀況 (TSB) 動態校準，確保配速設定在生理可持續的甜點區間。",
     "formula": "MP = VDOT_Pace × Flat_Efficiency_Ratio × Temp_Factor",
     "links": [
       {
@@ -962,12 +980,14 @@
       "riegel",
       "pb",
       "daniels",
-      "temp"
+      "temp",
+      "banister",
+      "pmcout"
     ],
     "downstream": [
       "gsheetout"
     ],
-    "mechanism": "綜合近期半馬 1:50:00 實績，經氣溫校正（高溫折損回補）與 Riegel 冪定律推演：秋冬目標大賽（15°C 最適溫）完賽時間鎖定在 3小時48分～3小時52分，具備極高達成勝率！",
+    "mechanism": "綜合近期賽事實績、環境氣溫校正（高溫折損回補）與 Riegel 冪定律推演，並深度結合 PMC 競技狀況 (TSB)：賽前 2~3 週適度減量 (Taper) 讓 TSB 爬升至 +5 ~ +15 巔峰窗口時，預估成績才能 100% 完美兌現；若處於過度疲勞期 (TSB < -20)，成績將面臨實質折損。",
     "formula": "T_Predicted = T_HM × (42.195 / 21.0975)^1.058 × Temp_Correction",
     "links": [
       {
@@ -1012,10 +1032,12 @@
     "category": "戰術輸出與賽事推演",
     "upstream": [
       "banister",
-      "rhr"
+      "rhr",
+      "plews"
     ],
     "downstream": [
-      "gsheetout"
+      "gsheetout",
+      "pred"
     ],
     "mechanism": "滾動監控長期體能 (CTL)、短期疲勞 (ATL) 與競技狀態 (TSB)。全開大賽後 ATL 升高，但透過主動排酸與充分休整，TSB 回升至正值甜蜜點，即具備執行高負荷長跑的就緒度。",
     "formula": "TSB = CTL - ATL (最佳競技窗口: -10 ~ +15)",
@@ -1030,39 +1052,14 @@
       }
     ]
   },
-  "stop閥": {
-    "title": "7K 防線停損閥與心率警報 (Guardrail Stop)",
-    "icon": "🛑",
-    "badge": "心率 > 163 終止",
-    "category": "戰術輸出與賽事推演",
-    "upstream": [
-      "plews",
-      "hrv",
-      "decoupling"
-    ],
-    "downstream": [
-      "gsheetout"
-    ],
-    "mechanism": "雙教練安全保護機制：當前日晨脈偏高或 HRV 低落時，自動啟動「安全檢驗閥」。若行進中心率飄破上限或左右平衡嚴重失衡（> 51:49），即刻發出終止長跑警告，改為快走折返。",
-    "formula": "IF (HR_7k > 163 || Balance_skew > 1.5%) -> ABORT_TO_WALK",
-    "links": [
-      {
-        "text": "Seiler, S. et al. (2007). Autonomic recovery after exercise in trained athletes: intensity and duration effects. MSSE, 39(8), 1366-1373.",
-        "url": "https://pubmed.ncbi.nlm.nih.gov/17545890/"
-      },
-      {
-        "text": "Joe Friel: Preventing Overtraining and Recognizing Cardiac Fatigue Markers.",
-        "url": "https://www.trainingpeaks.com/learn/articles/preventing-overtraining-in-endurance-athletes/"
-      }
-    ]
-  },
   "stamout": {
     "title": "Stamina 完賽剩餘體力與骨骼衝擊負荷",
     "icon": "📊",
     "badge": "剩餘 55% 充沛",
     "category": "戰術輸出與賽事推演",
     "upstream": [
-      "stamina"
+      "stamina",
+      "banister"
     ],
     "downstream": [
       "gsheetout"
@@ -1094,7 +1091,6 @@
       "pred",
       "gapout",
       "pmcout",
-      "stop閥",
       "stamout"
     ],
     "downstream": [],
@@ -1136,6 +1132,30 @@
       {
         "text": "Tarnopolsky, M. A. (2008). Sex differences in exercise metabolism and the role of 17-beta estradiol. MSSE, 40(4), 648-654.",
         "url": "https://pubmed.ncbi.nlm.nih.gov/18317381/"
+      }
+    ]
+  },
+  "vo2max": {
+    "title": "最大攝氧量 (VO₂max) 有氧引擎排氣量",
+    "icon": "🫁",
+    "badge": "48～54 ml/kg/min",
+    "category": "輸入參數 ➡️ 影響模型",
+    "upstream": [],
+    "downstream": [
+      "daniels",
+      "mp",
+      "pred"
+    ],
+    "mechanism": "人體在極限運動時每分鐘每公斤體重能攝取並利用的最大氧氣毫升數，代表有氧引擎的「氣缸排氣量」。Garmin API 可透過 metrics-service 取得手錶日常估算值；運動生理學則透過 Jack Daniels VDOT 公式將實戰成績與跑步經濟性整合，精準推導出比賽配速。",
+    "formula": "VO2max = 15.3 × (Max_HR / Rest_HR)\nVDOT ≈ VO2 / %VO2max",
+    "links": [
+      {
+        "text": "Hill, A. V. & Lupton, H. (1923). Muscular Exercise, Lactic Acid, and the Supply and Utilisation of Oxygen. QJM.",
+        "url": "https://academic.oup.com/qjmed/article-abstract/os-16/62/135/1547743"
+      },
+      {
+        "text": "Garmin Technology: VO2 Max Running Fitness Metric Science & Measurement.",
+        "url": "https://www.garmin.com/en-US/garmin-technology/running-science/physiological-measurements/vo2-max/"
       }
     ]
   }
